@@ -1,0 +1,50 @@
+package ranking
+
+import cats.effect.IO
+import munit.CatsEffectSuite
+import ranking.domain.{RankedEntry, TeamName}
+import ranking.interpreter.LiveOutputFormatter
+
+class OutputFormatterSuite extends CatsEffectSuite:
+
+  val formatter = LiveOutputFormatter.make[IO]
+
+  private def entry(rank: Int, name: String, points: Int): RankedEntry =
+    RankedEntry(rank, TeamName(name), points)
+
+  test("format entry with plural pts") {
+    formatter.format(List(entry(1, "Tarantulas", 6))).map { lines =>
+      assertEquals(lines.head, "1. Tarantulas, 6 pts")
+    }
+  }
+
+  test("format entry with singular pt") {
+    formatter.format(List(entry(3, "FC Awesome", 1))).map { lines =>
+      assertEquals(lines.head, "3. FC Awesome, 1 pt")
+    }
+  }
+
+  test("format entry with zero pts") {
+    formatter.format(List(entry(5, "Grouches", 0))).map { lines =>
+      assertEquals(lines.head, "5. Grouches, 0 pts")
+    }
+  }
+
+  test("format multi-word team name") {
+    formatter.format(List(entry(3, "FC Awesome", 1))).map { lines =>
+      assert(lines.head.contains("FC Awesome"))
+    }
+  }
+
+  test("preserves ordering of input entries") {
+    val entries = List(
+      entry(1, "Tarantulas", 6),
+      entry(2, "Lions", 5),
+      entry(3, "FC Awesome", 1)
+    )
+    formatter.format(entries).map { lines =>
+      assertEquals(lines(0), "1. Tarantulas, 6 pts")
+      assertEquals(lines(1), "2. Lions, 5 pts")
+      assertEquals(lines(2), "3. FC Awesome, 1 pt")
+    }
+  }
