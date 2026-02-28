@@ -35,19 +35,21 @@ scala-cli fix --power .
 
 ## Architecture
 
-Tagless final only where the effect is real. Each feature package contains a trait and a `private Live` implementation nested in its companion object:
+Tagless final only where the effect is real. Each feature package contains a trait and a `private Live` implementation nested in its companion object.
+
+All source lives under `src/io/github/decarb/rankingtable/` and tests under `test/io/github/decarb/rankingtable/`, mirroring the package structure:
 
 ```
-model/types/package.scala     TeamName, Score (opaque types)
-model/GameResult.scala        GameResult
-model/RankedEntry.scala       RankedEntry
+domain/types.scala            TeamName, Score (opaque types)
+domain/GameResult.scala       GameResult
+domain/RankedEntry.scala      RankedEntry
 
-input/InputParser[F]          parse lines → F[GameResult]   (ApplicativeThrow — can fail)
-calculator/RankingCalculator  GameResult  → List[RankedEntry]  (pure)
-output/OutputFormatter        RankedEntry → List[String]       (pure)
+input/InputParser[F]          parse lines → F[List[GameResult]]  (ApplicativeThrow — can fail)
+calculator/RankingCalculator  GameResult  → List[RankedEntry]    (pure)
+output/OutputFormatter        List[RankedEntry] → List[String]   (pure)
 
 Program[F]                    composes the three (requires Functor)
-Main                          IOApp wiring + decline CLI options
+Main                          CommandIOApp wiring + decline CLI options
 ```
 
 `InputParser` is the only effectful algebra; `RankingCalculator` and `OutputFormatter` are pure traits with no `F[_]`. `Program` only requires `Functor` to `map` the parser result through the two pure steps.
@@ -59,7 +61,8 @@ Before committing, always run in this order:
 1. `scala-cli fix --power .` — lint/fix
 2. `scala-cli fmt .` — format
 3. `scala-cli test .` — all tests must pass
-4. `git commit` — only if all steps above succeed
+4. Check that `CLAUDE.md` and `docs/` are consistent with any code changes
+5. `git commit` — only if all steps above succeed
 
 ## Git conventions
 
