@@ -1,6 +1,6 @@
-package ranking.output
+package io.github.decarb.rankingtable.output
 
-import ranking.domain.RankedEntry
+import io.github.decarb.rankingtable.domain.RankedEntry
 
 trait OutputFormatter:
   def format(entries: List[RankedEntry]): List[String]

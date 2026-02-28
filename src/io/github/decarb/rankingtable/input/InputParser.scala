@@ -1,8 +1,8 @@
-package ranking.input
+package io.github.decarb.rankingtable.input
 
 import cats.ApplicativeThrow
 import cats.syntax.all.*
-import ranking.domain.{GameResult, Score, TeamName}
+import io.github.decarb.rankingtable.domain.{GameResult, Score, TeamName}
 
 trait InputParser[F[_]: cats.Applicative]:
   def parseLine(line: String): F[GameResult]

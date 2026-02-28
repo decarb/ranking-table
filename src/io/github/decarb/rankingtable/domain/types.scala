@@ -1,4 +1,4 @@
-package ranking.domain
+package io.github.decarb.rankingtable.domain
 
 opaque type TeamName = String
 object TeamName:

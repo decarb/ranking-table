@@ -1,8 +1,8 @@
-package ranking.input
+package io.github.decarb.rankingtable.input
 
 import cats.effect.IO
 import munit.CatsEffectSuite
-import ranking.domain.{Score, TeamName}
+import io.github.decarb.rankingtable.domain.{Score, TeamName}
 
 class InputParserSuite extends CatsEffectSuite:
 

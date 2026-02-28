@@ -1,6 +1,6 @@
-package ranking.calculator
+package io.github.decarb.rankingtable.calculator
 
-import ranking.domain.{GameResult, RankedEntry, TeamName}
+import io.github.decarb.rankingtable.domain.{GameResult, RankedEntry, TeamName}
 
 trait RankingCalculator:
   def calculate(results: List[GameResult]): List[RankedEntry]
