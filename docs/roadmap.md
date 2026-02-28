@@ -234,14 +234,21 @@ Test coverage gaps exist: Main.scala is untested, IntegrationSuite actually test
 
 ---
 
-## PR 6: Dockerfile + release workflow
-
-TODO: Understand tags a little better to ensure that releases cant just randomly be tagged by anyone.
-TODO: How do we test the tagging release process?
+## PR 6: Dockerfile + release workflow ✅
 
 ### Context
 
-Not everyone has scala-cli installed. A Dockerfile provides universal build/run capability. A GitHub Actions release workflow builds a Docker image when a version tag is manually created, avoiding release spam from every merge.
+Not everyone has scala-cli installed. A Dockerfile provides universal build/run capability. A GitHub Actions release workflow builds and pushes a Docker image to GitHub Container Registry (ghcr.io) when a version tag is manually created, avoiding release spam from every merge.
+
+### Tag protection
+
+By default anyone with write access can push a `v*` tag. To restrict this: Settings → Rules → Rulesets → create a ruleset targeting `refs/tags/v*`, set "Restrict creations" to Admins only. No extra tooling required.
+
+### Testing the release process
+
+1. Verify the Dockerfile locally: `docker build -t ranking-table .`
+2. Push a pre-release tag to trigger the full workflow: `git tag v0.0.0-rc1 && git push --tags`
+3. Inspect the resulting GitHub Release and ghcr.io image, then delete the test tag
 
 ### Changes
 
@@ -250,7 +257,7 @@ Not everyone has scala-cli installed. A Dockerfile provides universal build/run 
 FROM virtuslab/scala-cli:latest AS builder
 WORKDIR /app
 COPY . .
-RUN scala-cli package --assembly . -o /app/ranking-table.jar
+RUN scala-cli package --power --assembly . -o /app/ranking-table.jar
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
@@ -258,7 +265,7 @@ COPY --from=builder /app/ranking-table.jar .
 ENTRYPOINT ["java", "-jar", "ranking-table.jar"]
 ```
 
-**`.github/workflows/release.yml`** (new) — Triggered on tag push:
+**`.github/workflows/release.yml`** (new) — Triggered on tag push, builds and pushes a Docker image to ghcr.io:
 ```yaml
 name: Release
 on:
@@ -268,18 +275,24 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: coursier/cache-action@v6
-      - uses: VirtusLab/scala-cli-setup@v1
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          jvm: temurin:21
-      - name: Build fat JAR
-        run: scala-cli package --assembly . -o ranking-table.jar
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        with:
-          files: ranking-table.jar
 ```
 
 Versioning: manual tags (`git tag v1.0.0 && git push --tags`) trigger the workflow. No auto-increment — you control when releases happen.
@@ -322,4 +335,4 @@ cat results.txt | docker run --rm -i ranking-table
 | 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` | ✅ Done |
 | 4  | Inline interactive validation | `Main.scala` | ✅ Done |
 | 5  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | ✅ Done |
-| 6  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | Pending |
+| 6  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | ✅ Done |
