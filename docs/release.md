@@ -2,7 +2,11 @@
 
 ## Overview
 
-Releases are triggered by pushing a version tag. The workflow builds a Docker image and pushes it to GitHub Container Registry (ghcr.io), then creates a GitHub Release.
+Releases are triggered by pushing a version tag. The workflow:
+
+1. Builds a Docker image and pushes it to GitHub Container Registry (ghcr.io)
+2. Extracts the assembly JAR from the Docker builder stage (layer cache reuse — no recompilation)
+3. Creates a GitHub Release with the JAR attached as a downloadable asset
 
 ## Creating a release
 
@@ -11,10 +15,18 @@ git tag v1.0.0
 git push --tags
 ```
 
-The workflow runs automatically. Once complete, the image is available at:
+The workflow runs automatically. Once complete:
 
-```
-ghcr.io/decarb/ranking-table:v1.0.0
+- Docker image: `ghcr.io/decarb/ranking-table:v1.0.0`
+- JAR: attached to the GitHub Release as `ranking-table.jar`
+
+## Running a released JAR
+
+Requires only a JRE (Java 21+) — no Docker or scala-cli needed:
+
+```bash
+java -jar ranking-table.jar             # interactive prompt
+java -jar ranking-table.jar results.txt # file input
 ```
 
 ## Running a released image
@@ -60,11 +72,12 @@ git tag v0.0.0-rc1
 git push --tags
 ```
 
-Verify the image and release on GitHub, then delete the tag:
+Verify the image, JAR asset, and release on GitHub, then delete both the tag and release:
 
 ```bash
 git tag -d v0.0.0-rc1
 git push --delete origin v0.0.0-rc1
+gh release delete v0.0.0-rc1 --yes
 ```
 
 To test the Dockerfile locally before pushing:
