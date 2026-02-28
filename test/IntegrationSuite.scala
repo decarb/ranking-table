@@ -15,7 +15,7 @@ class IntegrationSuite extends CatsEffectSuite:
   )
 
   test("sample data produces the expected ranking table") {
-    val input = List(
+    val input    = List(
       "Lions 3, Snakes 3",
       "Tarantulas 1, FC Awesome 0",
       "Lions 1, FC Awesome 1",

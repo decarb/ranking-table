@@ -39,5 +39,5 @@ object Main extends CommandIOApp(
           try src.getLines().toList.filter(_.nonEmpty)
           finally src.close()
         }
-      case None =>
+      case None       =>
         IO.blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty))

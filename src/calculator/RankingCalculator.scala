@@ -21,7 +21,7 @@ object RankingCalculator:
           .updatedWith(result.homeTeam)(pts => Some(pts.getOrElse(0) + homePoints))
           .updatedWith(result.awayTeam)(pts => Some(pts.getOrElse(0) + awayPoints))
       }
-      val sorted = pointsMap.toList.sortBy { case (team, pts) => (-pts, team.value) }
+      val sorted    = pointsMap.toList.sortBy { case (team, pts) => (-pts, team.value) }
       assignRanks(sorted)
 
     private def pointsFor(result: GameResult): (Int, Int) =
