@@ -35,12 +35,16 @@ scala-cli fix --power .
 
 ## Architecture
 
-Tagless final pattern. Three algebras, each with a single live interpreter:
+Tagless final pattern. Each feature package contains a trait and a `private Live` implementation nested in its companion object:
 
 ```
-algebra/InputParser[F]        parse lines → GameResult
-algebra/RankingCalculator[F]  GameResult  → RankedEntry
-algebra/OutputFormatter[F]    RankedEntry → String
+model/types/package.scala     TeamName, Score (opaque types)
+model/GameResult.scala        GameResult
+model/RankedEntry.scala       RankedEntry
+
+input/InputParser[F]          parse lines → GameResult
+calculator/RankingCalculator  GameResult  → RankedEntry
+output/OutputFormatter[F]     RankedEntry → String
 
 Program[F]                    composes the three algebras (requires FlatMap)
 Main                          IOApp wiring + decline CLI options

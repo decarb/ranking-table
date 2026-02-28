@@ -2,7 +2,9 @@ package ranking
 
 import cats.FlatMap
 import cats.syntax.all.*
-import ranking.algebra.{InputParser, OutputFormatter, RankingCalculator}
+import ranking.calculator.RankingCalculator
+import ranking.input.InputParser
+import ranking.output.OutputFormatter
 
 /** Composes the three algebras into a single pipeline.
   *

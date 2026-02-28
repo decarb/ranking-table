@@ -5,7 +5,9 @@ import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.*
 import java.nio.file.Path
-import ranking.interpreter.{LiveInputParser, LiveOutputFormatter, LiveRankingCalculator}
+import ranking.calculator.RankingCalculator
+import ranking.input.InputParser
+import ranking.output.OutputFormatter
 
 object Main extends CommandIOApp(
       name = "ranking-table",
@@ -17,9 +19,9 @@ object Main extends CommandIOApp(
   def main: Opts[IO[ExitCode]] =
     inputFileOpt.map { maybeFile =>
       val program = Program.make[IO](
-        LiveInputParser.make[IO],
-        LiveRankingCalculator.make[IO],
-        LiveOutputFormatter.make[IO]
+        InputParser.make[IO],
+        RankingCalculator.make[IO],
+        OutputFormatter.make[IO]
       )
 
       for
