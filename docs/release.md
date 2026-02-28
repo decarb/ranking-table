@@ -5,8 +5,20 @@
 Releases are triggered by pushing a version tag. The workflow:
 
 1. Builds a Docker image and pushes it to GitHub Container Registry (ghcr.io)
-2. Extracts the assembly JAR from the Docker builder stage (layer cache reuse — no recompilation)
+2. Extracts the assembly JAR via the `jar-export` stage (layer cache reuse — no recompilation)
 3. Creates a GitHub Release with the JAR attached as a downloadable asset
+
+### Dockerfile stages
+
+The Dockerfile has three stages:
+
+| Stage | Base | Purpose |
+|-------|------|---------|
+| `builder` | `virtuslab/scala-cli` | Compiles source and produces the assembly JAR |
+| `jar-export` | `scratch` | Holds only the JAR for clean CI extraction (the builder stage leaves a bloop Unix socket on disk that BuildKit's local exporter cannot handle) |
+| *(default)* | `eclipse-temurin:21-jre-alpine` | Minimal runtime image — the target for `docker build` and `docker run` |
+
+`docker build -t ranking-table .` always targets the final (default) stage, so local usage is unaffected.
 
 ## Creating a release
 
