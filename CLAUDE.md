@@ -27,6 +27,24 @@ scala-cli fmt .
 
 # Lint / fix (--power required for experimental sub-command)
 scala-cli fix --power .
+
+# Docker build
+docker build -t ranking-table .
+
+# Docker run (interactive — prompts for input line by line)
+docker run --rm -it ranking-table
+
+# Docker run (pipe — simplest for small inputs)
+echo "Lions 3, Snakes 3" | docker run --rm -i ranking-table
+
+# Docker run (file input)
+docker run --rm -v $(pwd)/results.txt:/app/results.txt ranking-table results.txt
+
+# Docker run (file input + output file)
+docker run --rm \
+  -v $(pwd)/results.txt:/app/results.txt \
+  -v $(pwd)/rankings.txt:/app/rankings.txt \
+  ranking-table results.txt --output-file rankings.txt
 ```
 
 ## Stack
