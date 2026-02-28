@@ -190,8 +190,8 @@ scala-cli test .
 
 ## Development
 
-The solution was built across six sequential stages. Each was independently shippable — no stage
-depended on a later one.
+The solution was built across seven sequential stages. Each was independently shippable — no
+stage depended on a later one.
 
 | Stage | What changed                 | Key decision                                                       |
 | ----- | ---------------------------- | ------------------------------------------------------------------ |
@@ -201,6 +201,7 @@ depended on a later one.
 | 4     | `--output-file` option       | Decline `Opts` compose; no changes to `Program` or pure stages     |
 | 5     | Interactive stdin            | TTY via `System.console()`; inline validation as a follow-up       |
 | 6     | Docker + release             | Three-stage Dockerfile; `scratch` isolates JAR from Bloop socket   |
+| 7     | Input boundary validation    | Trim whitespace at parse boundaries; reject negative scores        |
 
 See [docs/development.md](docs/development.md) for the full rationale behind each stage.
 
