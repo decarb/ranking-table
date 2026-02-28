@@ -153,7 +153,54 @@ scala-cli run .
 
 ---
 
-## PR 4: Test improvements (separate session)
+## PR 4: Inline validation in interactive mode
+
+### Context
+
+In interactive mode (PR 3), lines are collected as raw strings and only parsed once the user signals completion with an empty line. A malformed line on entry 3 of 10 is only caught after entry 10 — the user must start over. This PR validates each line immediately on entry, re-prompting with a clear error message so the user can fix mistakes in place.
+
+### Changes
+
+**`src/.../Main.scala`** — Thread the parser into the interactive read loop:
+
+- Change `readLinesInteractive` signature to accept `InputParser[IO]`
+- Replace the `IO.blocking` iterator with a recursive `IO` loop using `flatMap`
+- On each line: attempt `parser.parseLine(line)`; on `Left` print the error and re-prompt; on `Right` accumulate and continue
+- Pass the parser from `main` down through `readLines` to `readLinesInteractive`
+
+```scala
+private def readLoop(
+  console: java.io.Console,
+  parser:  InputParser[IO],
+  acc:     List[String]
+): IO[List[String]] =
+  IO.blocking(console.readLine("> ")).flatMap {
+    case null | "" => IO.pure(acc.reverse)
+    case line =>
+      parser.parseLine(line).attempt.flatMap {
+        case Right(_) => readLoop(console, parser, line :: acc)
+        case Left(e)  =>
+          IO.println(s"  Error: ${e.getMessage}. Try again.") *>
+            readLoop(console, parser, acc)
+      }
+  }
+```
+
+### Files modified
+
+- `src/io/github/decarb/rankingtable/Main.scala`
+
+### Verification
+
+- Enter a malformed line in interactive mode — error shown, prompt repeats
+- Enter a valid line after a bad one — accepted, loop continues
+- Empty line after valid entries — results printed correctly
+- Piped and file modes unaffected
+- `scala-cli test .` — all tests pass
+
+---
+
+## PR 5: Test improvements (separate session)
 
 ### Context
 
@@ -187,7 +234,7 @@ Test coverage gaps exist: Main.scala is untested, IntegrationSuite actually test
 
 ---
 
-## PR 5: Dockerfile + release workflow
+## PR 6: Dockerfile + release workflow
 
 TODO: Understand tags a little better to ensure that releases cant just randomly be tagged by anyone.
 TODO: How do we test the tagging release process?
@@ -273,5 +320,6 @@ cat results.txt | docker run --rm -i ranking-table
 | 1  | Workflow docs | `CLAUDE.md`, `.github/pull_request_template.md` | ✅ Done |
 | 2  | Output file support | `Main.scala`, `CLAUDE.md` | ✅ Done |
 | 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` | ✅ Done |
-| 4  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | Pending |
-| 5  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | Pending |
+| 4  | Inline interactive validation | `Main.scala` | Pending |
+| 5  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | Pending |
+| 6  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | Pending |
