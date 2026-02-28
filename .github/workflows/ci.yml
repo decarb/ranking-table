@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: coursier/cache-action@v6
+      - uses: VirtusLab/scala-cli-setup@v1
+        with:
+          jvm: temurin:21
+      - name: Run tests
+        run: scala-cli test .
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: coursier/cache-action@v6
+      - uses: VirtusLab/scala-cli-setup@v1
+        with:
+          jvm: temurin:21
+          power: true
+      - name: Check lint
+        run: |
+          scala-cli fix --power .
+          git diff --exit-code || (
+            echo "Run 'scala-cli fix --power .' locally to fix lint issues."
+            exit 1
+          )
+
+  format:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: coursier/cache-action@v6
+      - uses: VirtusLab/scala-cli-setup@v1
+        with:
+          jvm: temurin:21
+      - name: Check formatting
+        run: |
+          scala-cli fmt --check . || (
+            echo "Run 'scala-cli fmt .' locally to fix formatting."
+            exit 1
+          )
