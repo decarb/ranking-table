@@ -4,7 +4,7 @@ Each PR is independently shippable. No PR depends on a later one.
 
 ---
 
-## PR 1: Strengthen pre-commit workflow documentation
+## PR 1: Strengthen pre-commit workflow documentation ✅
 
 ### Context
 
@@ -51,24 +51,22 @@ Before committing, always run in this order:
 
 ---
 
-## PR 2: Output file support
-
-TODO: Update command to be output-file instead in order to align with input-file 
+## PR 2: Output file support ✅
 
 ### Context
 
-Currently output goes to stdout only. Adding `--output <file>` allows users to write results to a file. This also modularises the output side-effect in preparation for PR 3 (interactive stdin).
+Currently output goes to stdout only. Adding `--output-file <file>` allows users to write results to a file. This also modularises the output side-effect in preparation for PR 3 (interactive stdin).
 
 ### Changes
 
 **`src/.../Main.scala`** — Add decline option and output writer:
 
-- Add `outputFileOpt: Opts[Option[Path]]` — optional `--output` / `-o` flag
+- Add `outputFileOpt: Opts[Option[Path]]` — optional `--output-file` / `-o` flag
 - Combine with `inputFileOpt` in `main` via `(inputFileOpt, outputFileOpt).mapN`
 - Extract output writing to a private method:
   ```scala
-  private def writeOutput(lines: List[String], maybeOut: Option[Path]): IO[Unit] =
-    maybeOut match
+  private def writeOutput(lines: List[String], maybeFile: Option[Path]): IO[Unit] =
+    maybeFile match
       case Some(path) =>
         IO.blocking {
           val pw = new java.io.PrintWriter(path.toFile)
@@ -78,12 +76,12 @@ Currently output goes to stdout only. Adding `--output <file>` allows users to w
       case None =>
         lines.traverse_(IO.println)
   ```
-- Replace `output.traverse_(IO.println)` with `writeOutput(output, maybeOut)`
+- Replace `output.traverse_(IO.println)` with `writeOutput(output, maybeOutput)`
 
-**`CLAUDE.md`** — Update Commands section to document `--output`:
+**`CLAUDE.md`** — Update Commands section to document `--output-file`:
 ```bash
 # Run with output file
-scala-cli run . -- results.txt --output rankings.txt
+scala-cli run . -- results.txt --output-file rankings.txt
 ```
 
 ### Files modified
@@ -94,7 +92,7 @@ scala-cli run . -- results.txt --output rankings.txt
 ### Verification
 
 - `scala-cli run . -- results.txt` — still prints to stdout
-- `scala-cli run . -- results.txt --output out.txt` — writes to file, verify contents
+- `scala-cli run . -- results.txt --output-file out.txt` — writes to file, verify contents
 - `scala-cli run . -- --help` — shows both args in help text
 - `scala-cli test .` — existing tests still pass
 
@@ -172,7 +170,7 @@ Test coverage gaps exist: Main.scala is untested, IntegrationSuite actually test
 - Test cases:
   - Valid file arg parses and runs successfully
   - Missing file arg falls back (no error)
-  - `--output` flag parses correctly (if PR 2 is merged)
+  - `--output-file` flag parses correctly (if PR 2 is merged)
   - `--help` produces output without error
 
 **Munit style research** needed before implementation — to be done in that session.
@@ -270,10 +268,10 @@ cat results.txt | docker run --rm -i ranking-table
 
 ## Summary
 
-| PR | Scope | Files |
-|----|-------|-------|
-| 1  | Workflow docs | `CLAUDE.md`, `.github/pull_request_template.md` |
-| 2  | Output file support | `Main.scala`, `CLAUDE.md` |
-| 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` |
-| 4  | Test improvements | `IntegrationSuite` rename + new *(separate session)* |
-| 5  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` |
+| PR | Scope | Files | Status |
+|----|-------|-------|--------|
+| 1  | Workflow docs | `CLAUDE.md`, `.github/pull_request_template.md` | ✅ Done |
+| 2  | Output file support | `Main.scala`, `CLAUDE.md` | ✅ Done |
+| 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` | Pending |
+| 4  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | Pending |
+| 5  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | Pending |

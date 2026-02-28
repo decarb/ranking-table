@@ -61,13 +61,14 @@ Main                          CommandIOApp wiring + decline CLI options
 
 Before committing, always run in this order:
 
-1. `scala-cli fix --power .` — lint/fix
-2. `scala-cli fmt .` — format
-3. `scala-cli test .` — all tests must pass
-4. Check that `CLAUDE.md` and `docs/` are consistent with any code changes
-5. `git add` all modified files (code, docs, formatted sources)
-6. `git status` — confirm everything is staged, nothing unexpected
-7. `git commit` — only if all steps above succeed
+1. `git fetch origin && git rebase origin/main` — stay current with main
+2. `scala-cli fix --power .` — lint/fix
+3. `scala-cli fmt .` — format
+4. `scala-cli test .` — all tests must pass
+5. Check that `CLAUDE.md` and `docs/` are consistent with any code changes
+6. `git add` all modified files (code, docs, formatted sources)
+7. `git status` — confirm everything is staged, nothing unexpected
+8. `git commit` — only if all steps above succeed
 
 ## Git conventions
 
