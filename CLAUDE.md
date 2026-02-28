@@ -13,6 +13,9 @@ scala-cli run .
 # Run (file)
 scala-cli run . -- results.txt
 
+# Run (file, write output to file)
+scala-cli run . -- results.txt --output-file rankings.txt
+
 # Tests
 scala-cli test .
 
