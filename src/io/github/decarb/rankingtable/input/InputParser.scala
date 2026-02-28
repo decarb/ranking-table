@@ -23,12 +23,12 @@ object InputParser:
       line.split(", ", 2).toList match
         case homeStr :: awayStr :: Nil =>
           for
-            home                 <- parseTeamScore(homeStr)
+            home <- parseTeamScore(homeStr)
             (homeName, homeScore) = home
-            away                 <- parseTeamScore(awayStr)
+            away <- parseTeamScore(awayStr)
             (awayName, awayScore) = away
           yield GameResult(homeName, homeScore, awayName, awayScore)
-        case _                         =>
+        case _ =>
           Left(ParseError(s"Expected 'Team score, Team score' but got: '$line'"))
 
     private def parseTeamScore(s: String): Either[Throwable, (TeamName, Score)] =
