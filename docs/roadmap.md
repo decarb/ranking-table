@@ -200,7 +200,7 @@ private def readLoop(
 
 ---
 
-## PR 5: Test improvements (separate session)
+## PR 5: Test improvements (separate session) ✅
 
 ### Context
 
@@ -321,5 +321,5 @@ cat results.txt | docker run --rm -i ranking-table
 | 2  | Output file support | `Main.scala`, `CLAUDE.md` | ✅ Done |
 | 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` | ✅ Done |
 | 4  | Inline interactive validation | `Main.scala` | ✅ Done |
-| 5  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | Pending |
+| 5  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | ✅ Done |
 | 6  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | Pending |
