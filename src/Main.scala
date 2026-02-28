@@ -20,8 +20,8 @@ object Main extends CommandIOApp(
     inputFileOpt.map { maybeFile =>
       val program = Program.make[IO](
         InputParser.make[IO],
-        RankingCalculator.make[IO],
-        OutputFormatter.make[IO]
+        RankingCalculator.make,
+        OutputFormatter.make
       )
 
       for

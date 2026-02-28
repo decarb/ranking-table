@@ -1,49 +1,38 @@
 package ranking.output
 
-import cats.effect.IO
-import munit.CatsEffectSuite
+import munit.FunSuite
 import ranking.domain.{RankedEntry, TeamName}
 
-class OutputFormatterSuite extends CatsEffectSuite:
+class OutputFormatterSuite extends FunSuite:
 
-  val formatter = OutputFormatter.make[IO]
+  val formatter = OutputFormatter.make
 
   private def entry(rank: Int, name: String, points: Int): RankedEntry =
     RankedEntry(rank, TeamName(name), points)
 
   test("format entry with plural pts") {
-    formatter.format(List(entry(1, "Tarantulas", 6))).map { lines =>
-      assertEquals(lines.head, "1. Tarantulas, 6 pts")
-    }
+    assertEquals(formatter.format(List(entry(1, "Tarantulas", 6))).head, "1. Tarantulas, 6 pts")
   }
 
   test("format entry with singular pt") {
-    formatter.format(List(entry(3, "FC Awesome", 1))).map { lines =>
-      assertEquals(lines.head, "3. FC Awesome, 1 pt")
-    }
+    assertEquals(formatter.format(List(entry(3, "FC Awesome", 1))).head, "3. FC Awesome, 1 pt")
   }
 
   test("format entry with zero pts") {
-    formatter.format(List(entry(5, "Grouches", 0))).map { lines =>
-      assertEquals(lines.head, "5. Grouches, 0 pts")
-    }
+    assertEquals(formatter.format(List(entry(5, "Grouches", 0))).head, "5. Grouches, 0 pts")
   }
 
   test("format multi-word team name") {
-    formatter.format(List(entry(3, "FC Awesome", 1))).map { lines =>
-      assert(lines.head.contains("FC Awesome"))
-    }
+    assert(formatter.format(List(entry(3, "FC Awesome", 1))).head.contains("FC Awesome"))
   }
 
   test("preserves ordering of input entries") {
-    val entries = List(
+    val lines = formatter.format(List(
       entry(1, "Tarantulas", 6),
       entry(2, "Lions", 5),
       entry(3, "FC Awesome", 1)
-    )
-    formatter.format(entries).map { lines =>
-      assertEquals(lines(0), "1. Tarantulas, 6 pts")
-      assertEquals(lines(1), "2. Lions, 5 pts")
-      assertEquals(lines(2), "3. FC Awesome, 1 pt")
-    }
+    ))
+    assertEquals(lines(0), "1. Tarantulas, 6 pts")
+    assertEquals(lines(1), "2. Lions, 5 pts")
+    assertEquals(lines(2), "3. FC Awesome, 1 pt")
   }

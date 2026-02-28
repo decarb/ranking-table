@@ -14,7 +14,7 @@ object InputParser:
 
   def make[F[_]: ApplicativeThrow]: InputParser[F] = new Live[F]
 
-  private final class Live[F[_]: ApplicativeThrow] extends InputParser[F]:
+  final private class Live[F[_]: ApplicativeThrow] extends InputParser[F]:
 
     def parseLine(line: String): F[GameResult] =
       parseLineE(line).liftTo[F]
@@ -23,9 +23,9 @@ object InputParser:
       line.split(", ", 2).toList match
         case homeStr :: awayStr :: Nil =>
           for
-            home                  <- parseTeamScore(homeStr)
+            home <- parseTeamScore(homeStr)
             (homeName, homeScore) = home
-            away                  <- parseTeamScore(awayStr)
+            away <- parseTeamScore(awayStr)
             (awayName, awayScore) = away
           yield GameResult(homeName, homeScore, awayName, awayScore)
         case _ =>

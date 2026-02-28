@@ -1,20 +1,18 @@
 package ranking.calculator
 
-import cats.Applicative
-import cats.syntax.all.*
 import ranking.domain.{GameResult, RankedEntry, TeamName}
 
-trait RankingCalculator[F[_]]:
-  def calculate(results: List[GameResult]): F[List[RankedEntry]]
+trait RankingCalculator:
+  def calculate(results: List[GameResult]): List[RankedEntry]
 
 object RankingCalculator:
 
-  def make[F[_]: Applicative]: RankingCalculator[F] = new Live[F]
+  def make: RankingCalculator = new Live
 
-  private final class Live[F[_]: Applicative] extends RankingCalculator[F]:
+  final private class Live extends RankingCalculator:
 
-    def calculate(results: List[GameResult]): F[List[RankedEntry]] =
-      computeStandings(results).pure[F]
+    def calculate(results: List[GameResult]): List[RankedEntry] =
+      computeStandings(results)
 
     private def computeStandings(results: List[GameResult]): List[RankedEntry] =
       val pointsMap = results.foldLeft(Map.empty[TeamName, Int]) { (acc, result) =>

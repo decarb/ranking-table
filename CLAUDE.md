@@ -35,22 +35,50 @@ scala-cli fix --power .
 
 ## Architecture
 
-Tagless final pattern. Each feature package contains a trait and a `private Live` implementation nested in its companion object:
+Tagless final only where the effect is real. Each feature package contains a trait and a `private Live` implementation nested in its companion object:
 
 ```
 model/types/package.scala     TeamName, Score (opaque types)
 model/GameResult.scala        GameResult
 model/RankedEntry.scala       RankedEntry
 
-input/InputParser[F]          parse lines → GameResult
-calculator/RankingCalculator  GameResult  → RankedEntry
-output/OutputFormatter[F]     RankedEntry → String
+input/InputParser[F]          parse lines → F[GameResult]   (ApplicativeThrow — can fail)
+calculator/RankingCalculator  GameResult  → List[RankedEntry]  (pure)
+output/OutputFormatter        RankedEntry → List[String]       (pure)
 
-Program[F]                    composes the three algebras (requires FlatMap)
+Program[F]                    composes the three (requires Functor)
 Main                          IOApp wiring + decline CLI options
 ```
 
-Constraints are kept minimal: interpreters only require `Applicative` or `ApplicativeThrow`; `Program` only requires `FlatMap`.
+`InputParser` is the only effectful algebra; `RankingCalculator` and `OutputFormatter` are pure traits with no `F[_]`. `Program` only requires `Functor` to `map` the parser result through the two pure steps.
+
+## Workflow
+
+Before committing, always run in this order:
+
+1. `scala-cli fix --power .` — lint/fix
+2. `scala-cli fmt .` — format
+3. `scala-cli test .` — all tests must pass
+4. `git commit` — only if all steps above succeed
+
+## Git conventions
+
+Commits use conventional commit format with a bulleted body:
+
+```
+<prefix>: <short imperative summary>
+
+- <individual change>
+- <individual change>
+```
+
+Prefixes: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`
+
+Rules:
+- Title is lowercase after the prefix, imperative mood, no trailing period
+- One logical change per bullet point
+- Omit the body only when the title is entirely self-explanatory
+- Do not include `Co-Authored-By` trailers
 
 ## Key conventions
 

@@ -9,4 +9,3 @@
 
 // Test
 //> using test.dependency org.scalameta::munit:1.2.3 org.typelevel::munit-cats-effect:2.1.0
-
