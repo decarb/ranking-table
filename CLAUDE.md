@@ -62,7 +62,9 @@ Before committing, always run in this order:
 2. `scala-cli fmt .` — format
 3. `scala-cli test .` — all tests must pass
 4. Check that `CLAUDE.md` and `docs/` are consistent with any code changes
-5. `git commit` — only if all steps above succeed
+5. `git add` all modified files (code, docs, formatted sources)
+6. `git status` — confirm everything is staged, nothing unexpected
+7. `git commit` — only if all steps above succeed
 
 ## Git conventions
 
