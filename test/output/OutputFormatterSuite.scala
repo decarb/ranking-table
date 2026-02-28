@@ -1,13 +1,12 @@
-package ranking
+package ranking.output
 
 import cats.effect.IO
 import munit.CatsEffectSuite
 import ranking.domain.{RankedEntry, TeamName}
-import ranking.interpreter.LiveOutputFormatter
 
 class OutputFormatterSuite extends CatsEffectSuite:
 
-  val formatter = LiveOutputFormatter.make[IO]
+  val formatter = OutputFormatter.make[IO]
 
   private def entry(rank: Int, name: String, points: Int): RankedEntry =
     RankedEntry(rank, TeamName(name), points)

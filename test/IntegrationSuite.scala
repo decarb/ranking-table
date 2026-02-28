@@ -2,14 +2,16 @@ package ranking
 
 import cats.effect.IO
 import munit.CatsEffectSuite
-import ranking.interpreter.{LiveInputParser, LiveOutputFormatter, LiveRankingCalculator}
+import ranking.calculator.RankingCalculator
+import ranking.input.InputParser
+import ranking.output.OutputFormatter
 
 class IntegrationSuite extends CatsEffectSuite:
 
   val program = Program.make[IO](
-    LiveInputParser.make[IO],
-    LiveRankingCalculator.make[IO],
-    LiveOutputFormatter.make[IO]
+    InputParser.make[IO],
+    RankingCalculator.make[IO],
+    OutputFormatter.make[IO]
   )
 
   test("sample data produces the expected ranking table") {

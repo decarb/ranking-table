@@ -1,13 +1,12 @@
-package ranking
+package ranking.input
 
 import cats.effect.IO
 import munit.CatsEffectSuite
 import ranking.domain.{Score, TeamName}
-import ranking.interpreter.LiveInputParser
 
 class InputParserSuite extends CatsEffectSuite:
 
-  val parser = LiveInputParser.make[IO]
+  val parser = InputParser.make[IO]
 
   test("parse a win/loss result") {
     parser.parseLine("Lions 3, Snakes 1").map { r =>

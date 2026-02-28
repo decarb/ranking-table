@@ -1,13 +1,12 @@
-package ranking
+package ranking.calculator
 
 import cats.effect.IO
 import munit.CatsEffectSuite
 import ranking.domain.{GameResult, Score, TeamName}
-import ranking.interpreter.LiveRankingCalculator
 
 class RankingCalculatorSuite extends CatsEffectSuite:
 
-  val calculator = LiveRankingCalculator.make[IO]
+  val calculator = RankingCalculator.make[IO]
 
   private def game(home: String, hs: Int, away: String, as: Int): GameResult =
     GameResult(TeamName(home), Score(hs), TeamName(away), Score(as))
