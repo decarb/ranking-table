@@ -33,7 +33,7 @@ class RankingCalculatorSuite extends FunSuite:
   }
 
   test("teams with equal points share the same rank") {
-    val results = List(
+    val results   = List(
       game("FC Awesome", 1, "Snakes", 1),
       game("Lions", 4, "Grouches", 0)
     )
@@ -44,7 +44,7 @@ class RankingCalculatorSuite extends FunSuite:
   }
 
   test("rank after a tie skips correctly") {
-    val results = List(
+    val results  = List(
       game("FC Awesome", 1, "Snakes", 1),
       game("Lions", 4, "Grouches", 0)
     )
@@ -62,7 +62,7 @@ class RankingCalculatorSuite extends FunSuite:
   }
 
   test("accumulates points across multiple games for the same team") {
-    val results = List(
+    val results    = List(
       game("Tarantulas", 1, "FC Awesome", 0), // Tarantulas: 3pts
       game("Tarantulas", 3, "Snakes", 1)      // Tarantulas: +3pts = 6pts
     )
@@ -79,8 +79,8 @@ class RankingCalculatorSuite extends FunSuite:
       game("Tarantulas", 3, "Snakes", 1),
       game("Lions", 4, "Grouches", 0)
     )
-    val ranked = calculator.calculate(results)
-    val byTeam = ranked.map(r => r.team -> r).toMap
+    val ranked  = calculator.calculate(results)
+    val byTeam  = ranked.map(r => r.team -> r).toMap
 
     assertEquals(byTeam(TeamName("Tarantulas")).rank, 1)
     assertEquals(byTeam(TeamName("Tarantulas")).points, 6)
