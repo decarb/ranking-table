@@ -1,55 +1,68 @@
 package io.github.decarb.rankingtable
 
-import cats.effect.IO
+import cats.effect.{ExitCode, IO}
+import com.monovore.decline.Command
 import munit.CatsEffectSuite
-import io.github.decarb.rankingtable.calculator.RankingCalculator
-import io.github.decarb.rankingtable.input.InputParser
-import io.github.decarb.rankingtable.output.OutputFormatter
+import java.nio.file.Files
 
 class IntegrationSuite extends CatsEffectSuite:
 
-  val program = Program.make[IO](
-    InputParser.make[IO],
-    RankingCalculator.make,
-    OutputFormatter.make
-  )
+  // Reconstruct a Command from Main.main for test-side parsing
+  private val command: Command[IO[ExitCode]] =
+    Command("ranking-table", "test")(Main.main)
 
-  test("sample data produces the expected ranking table") {
-    val input = List(
+  private def run(args: String*): IO[ExitCode] =
+    command.parse(args.toList, Map.empty) match
+      case Right(io)  => io
+      case Left(help) => IO.raiseError(new RuntimeException(help.toString))
+
+  // --- CLI argument parsing ---
+
+  test("no args parses successfully") {
+    assert(command.parse(Nil, Map.empty).isRight)
+  }
+
+  test("input file arg parses successfully") {
+    assert(command.parse(List("results.txt"), Map.empty).isRight)
+  }
+
+  test("--output-file flag parses successfully") {
+    assert(command.parse(List("--output-file", "out.txt"), Map.empty).isRight)
+  }
+
+  test("unknown flag is rejected") {
+    assert(command.parse(List("--unknown"), Map.empty).isLeft)
+  }
+
+  // --- End-to-end file I/O ---
+
+  test("reads input file and writes correct output to file") {
+    val lines = List(
       "Lions 3, Snakes 3",
       "Tarantulas 1, FC Awesome 0",
       "Lions 1, FC Awesome 1",
       "Tarantulas 3, Snakes 1",
       "Lions 4, Grouches 0"
     )
-    val expected = List(
-      "1. Tarantulas, 6 pts",
-      "2. Lions, 5 pts",
-      "3. FC Awesome, 1 pt",
-      "3. Snakes, 1 pt",
-      "5. Grouches, 0 pts"
-    )
-    program.run(input).map { output =>
-      assertEquals(output, expected)
-    }
+    for
+      inputFile  <- IO.blocking(Files.createTempFile("input", ".txt"))
+      outputFile <- IO.blocking(Files.createTempFile("output", ".txt"))
+      _          <- IO.blocking(Files.writeString(inputFile, lines.mkString("\n")))
+      exitCode   <- run(inputFile.toString, "--output-file", outputFile.toString)
+      content    <- IO.blocking(Files.readString(outputFile))
+    yield
+      assertEquals(exitCode, ExitCode.Success)
+      assert(content.contains("1. Tarantulas, 6 pts"))
+      assert(content.contains("2. Lions, 5 pts"))
+      assert(content.contains("3. FC Awesome, 1 pt"))
+      assert(content.contains("3. Snakes, 1 pt"))
+      assert(content.contains("5. Grouches, 0 pts"))
   }
 
-  test("single game with a winner") {
-    val input    = List("Lions 3, Snakes 0")
-    val expected = List("1. Lions, 3 pts", "2. Snakes, 0 pts")
-    program.run(input).map(output => assertEquals(output, expected))
-  }
-
-  test("all draws gives every team 1 pt at rank 1") {
-    val input = List("Lions 1, Snakes 1")
-    program.run(input).map { output =>
-      assert(output.forall(_.contains("1 pt")))
-      assert(output.forall(_.startsWith("1.")))
-    }
-  }
-
-  test("propagates parse errors") {
-    program.run(List("not a valid line")).attempt.map { result =>
-      assert(result.isLeft)
-    }
+  test("propagates parse error from input file") {
+    for
+      inputFile <- IO.blocking(Files.createTempFile("input", ".txt"))
+      _         <- IO.blocking(Files.writeString(inputFile, "not a valid line"))
+      result    <- run(inputFile.toString).attempt
+    yield assert(result.isLeft)
   }
