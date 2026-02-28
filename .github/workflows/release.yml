@@ -32,15 +32,15 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
 
-      - name: Extract JAR from builder stage
+      - name: Extract JAR from jar-export stage
         uses: docker/build-push-action@v5
         with:
           context: .
-          target:  builder
+          target:  jar-export
           outputs: type=local,dest=./build-output
           cache-from: type=gha
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build-output/app/ranking-table.jar
+          files: build-output/ranking-table.jar
