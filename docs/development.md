@@ -213,3 +213,43 @@ The release workflow triggers on `v*` tags and runs three steps in sequence:
 > be batched into one. Manual tagging keeps release control explicit and prevents release noise.
 
 See [docs/release.md](release.md) for the full release process.
+
+---
+
+## Stage 7 — Input boundary validation
+
+**Commits:** `a1f379d`
+
+Three edge cases in `InputParser.Live` were identified and fixed after the core implementation
+was complete.
+
+### Whitespace trimming
+
+Leading and trailing whitespace on a line, or extra spaces around a team name, were silently
+included in the extracted `TeamName`. Two entries differing only in surrounding whitespace were
+treated as separate teams by `RankingCalculator`.
+
+The fix adds `.trim` at two points: the full line before splitting, and the extracted name before
+constructing `TeamName`. This is the right boundary for normalisation — internal whitespace within
+a name (e.g. `FC Awesome`) is preserved, only surrounding whitespace is stripped.
+
+### Negative scores
+
+`scoreStr.toIntOption` accepted any integer. `"-3".toIntOption` returns `Some(-3)`, so a negative
+score silently produced an incorrect result rather than a parse error.
+
+The fix adds `.filter(_ >= 0)`: `None` falls through to the existing `ParseError` case with no
+special-case handling.
+
+### Empty team name after trim
+
+A fragment like `"   3"` passes the `lastSpace <= 0` guard (the last space is at a valid index)
+but produces an empty string after `.trim`. The fix adds an emptiness check after trimming, before
+constructing `TeamName`.
+
+### Case sensitivity — documented, not normalised
+
+`Map[TeamName, Int]` in `RankingCalculator` uses case-sensitive equality. Normalising correctly
+for all team name formats (abbreviations, hyphenated names, apostrophes) is non-trivial, and the
+test spec is silent on casing while the sample data is internally consistent. The behaviour is
+documented in the Input format section of `README.md` rather than normalised away.
