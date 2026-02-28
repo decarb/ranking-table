@@ -1,31 +1,22 @@
 package ranking
 
-import cats.FlatMap
+import cats.Functor
 import cats.syntax.all.*
 import ranking.calculator.RankingCalculator
 import ranking.input.InputParser
 import ranking.output.OutputFormatter
 
-/** Composes the three algebras into a single pipeline.
-  *
-  * The tagless final style keeps this class decoupled from any concrete effect type — the same
-  * program wires up with IO in production and with a test double in unit tests.
-  */
-final class Program[F[_]: FlatMap](
+final class Program[F[_]: Functor](
   parser: InputParser[F],
-  calculator: RankingCalculator[F],
-  formatter: OutputFormatter[F]
+  calculator: RankingCalculator,
+  formatter: OutputFormatter
 ):
   def run(lines: List[String]): F[List[String]] =
-    for
-      results <- parser.parseLines(lines)
-      ranked  <- calculator.calculate(results)
-      output  <- formatter.format(ranked)
-    yield output
+    parser.parseLines(lines).map(calculator.calculate).map(formatter.format)
 
 object Program:
-  def make[F[_]: FlatMap](
+  def make[F[_]: Functor](
     parser: InputParser[F],
-    calculator: RankingCalculator[F],
-    formatter: OutputFormatter[F]
+    calculator: RankingCalculator,
+    formatter: OutputFormatter
   ): Program[F] = new Program(parser, calculator, formatter)

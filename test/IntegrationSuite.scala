@@ -10,8 +10,8 @@ class IntegrationSuite extends CatsEffectSuite:
 
   val program = Program.make[IO](
     InputParser.make[IO],
-    RankingCalculator.make[IO],
-    OutputFormatter.make[IO]
+    RankingCalculator.make,
+    OutputFormatter.make
   )
 
   test("sample data produces the expected ranking table") {
