@@ -10,9 +10,10 @@ import io.github.decarb.rankingtable.input.InputParser
 import io.github.decarb.rankingtable.output.OutputFormatter
 
 object Main extends CommandIOApp(
-      name = "ranking-table",
-      header = "Calculate a league ranking table from game results"
-    ):
+  name = "ranking-table",
+  header = "Calculate a league ranking table from game results"
+):
+
   private val inputFileOpt: Opts[Option[Path]] =
     Opts.argument[Path]("input-file").orNone
 
@@ -39,5 +40,5 @@ object Main extends CommandIOApp(
           try src.getLines().toList.filter(_.nonEmpty)
           finally src.close()
         }
-      case None       =>
+      case None =>
         IO.blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty))
