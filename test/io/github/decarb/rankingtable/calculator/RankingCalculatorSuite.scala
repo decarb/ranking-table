@@ -1,7 +1,7 @@
-package ranking.calculator
+package io.github.decarb.rankingtable.calculator
 
 import munit.FunSuite
-import ranking.domain.{GameResult, Score, TeamName}
+import io.github.decarb.rankingtable.domain.{GameResult, Score, TeamName}
 
 class RankingCalculatorSuite extends FunSuite:
 

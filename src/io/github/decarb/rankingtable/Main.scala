@@ -1,13 +1,13 @@
-package ranking
+package io.github.decarb.rankingtable
 
 import cats.effect.{ExitCode, IO}
 import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.*
 import java.nio.file.Path
-import ranking.calculator.RankingCalculator
-import ranking.input.InputParser
-import ranking.output.OutputFormatter
+import io.github.decarb.rankingtable.calculator.RankingCalculator
+import io.github.decarb.rankingtable.input.InputParser
+import io.github.decarb.rankingtable.output.OutputFormatter
 
 object Main extends CommandIOApp(
       name = "ranking-table",

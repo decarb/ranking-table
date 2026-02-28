@@ -1,7 +1,7 @@
-package ranking.output
+package io.github.decarb.rankingtable.output
 
 import munit.FunSuite
-import ranking.domain.{RankedEntry, TeamName}
+import io.github.decarb.rankingtable.domain.{RankedEntry, TeamName}
 
 class OutputFormatterSuite extends FunSuite:
 

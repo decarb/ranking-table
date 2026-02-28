@@ -1,10 +1,10 @@
-package ranking
+package io.github.decarb.rankingtable
 
 import cats.Functor
 import cats.syntax.all.*
-import ranking.calculator.RankingCalculator
-import ranking.input.InputParser
-import ranking.output.OutputFormatter
+import io.github.decarb.rankingtable.calculator.RankingCalculator
+import io.github.decarb.rankingtable.input.InputParser
+import io.github.decarb.rankingtable.output.OutputFormatter
 
 final class Program[F[_]: Functor](
   parser: InputParser[F],
