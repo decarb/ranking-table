@@ -52,11 +52,28 @@ object Main extends CommandIOApp(
 
   private def readLines(maybeFile: Option[Path]): IO[List[String]] =
     maybeFile match
-      case Some(path) =>
-        IO.blocking {
-          val src = scala.io.Source.fromFile(path.toFile)
-          try src.getLines().toList.filter(_.nonEmpty)
-          finally src.close()
+      case Some(path) => readLinesFromFile(path)
+      case None       =>
+        IO.blocking(System.console()).flatMap {
+          case null    => readLinesFromStdin
+          case console => readLinesInteractive(console)
         }
-      case None =>
-        IO.blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty))
+
+  private def readLinesFromFile(path: Path): IO[List[String]] =
+    IO.blocking {
+      val src = scala.io.Source.fromFile(path.toFile)
+      try src.getLines().toList.filter(_.nonEmpty)
+      finally src.close()
+    }
+
+  private def readLinesFromStdin: IO[List[String]] =
+    IO.blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty))
+
+  private def readLinesInteractive(console: java.io.Console): IO[List[String]] =
+    IO.println("Enter game results (one per line, empty line to finish):") *>
+      IO.blocking {
+        Iterator
+          .continually(console.readLine("> "))
+          .takeWhile(line => line != null && line.nonEmpty)
+          .toList
+      }

@@ -98,7 +98,7 @@ scala-cli run . -- results.txt --output-file rankings.txt
 
 ---
 
-## PR 3: Interactive stdin prompt loop
+## PR 3: Interactive stdin prompt loop ✅
 
 ### Context
 
@@ -272,6 +272,6 @@ cat results.txt | docker run --rm -i ranking-table
 |----|-------|-------|--------|
 | 1  | Workflow docs | `CLAUDE.md`, `.github/pull_request_template.md` | ✅ Done |
 | 2  | Output file support | `Main.scala`, `CLAUDE.md` | ✅ Done |
-| 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` | Pending |
+| 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` | ✅ Done |
 | 4  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | Pending |
 | 5  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | Pending |
