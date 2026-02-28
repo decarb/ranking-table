@@ -1,28 +1,40 @@
-# Branch Protection Recommendations
+# Branch Protection
 
-Recommended GitHub branch protection rules for the `main` branch.
+Recommended branch protection rules for the `main` branch. This project is solo-developed — PRs
+are used to gate CI and provide a self-review point and audit trail, but no approval step is
+needed.
 
-This project is solo-developed. PRs are still used — they gate CI and provide a self-review point and audit trail — but no approval step is needed. You merge your own PR once CI passes.
+## Recommended rules
 
-## Recommended set
+| Rule                                      | Reason                                                                              |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Require a pull request before merging** | Prevents direct pushes to `main`; every change goes through CI and a diff review   |
+| **Require status checks to pass**         | Blocks merges when `Test`, `Lint`, or `Format check` fail                          |
+| **Require branches to be up to date**     | Prevents a stale-base CI pass from landing on a `main` that has since moved        |
+| **Require linear history**                | Enforces rebase merges; keeps `git log` bisectable and readable                    |
+| **Do not allow bypassing for admins**     | Ensures CI gates apply even to the repository owner                                |
 
-- **Require a pull request before merging** — prevents direct pushes to `main`; ensures every change goes through CI and a self-review of the diff
-- **Require status checks to pass before merging** — blocks merges when any CI job fails (`Test`, `Lint`, `Format check`); pair with "require branches to be up to date" so stale branches cannot slip through
-- **Require linear history** — blocks merge commits; all PRs must be rebased, keeping `git log` bisectable and readable. Also disable "Allow merge commits" and "Allow squash merging" in repository settings (Settings → General → Pull Requests) so rebase is the only available merge method
-- **Do not allow bypassing settings for administrators** — without this, you can push directly to `main` and bypass CI, defeating the purpose
+## Merge strategy
 
-## Not needed for solo development
+"Allow merge commits" and "Allow squash merging" should both be disabled in repository settings
+(Settings → General → Pull Requests), leaving only "Allow rebase merging". Combined with "Require
+linear history" in branch protection, this makes rebase the only available merge method.
 
-- **Require approvals** — no other reviewers; skip this entirely
-- **Dismiss stale approvals / require code owner review** — irrelevant without approvals
-- **Require conversation resolution** — only meaningful when others leave review comments
+## What to skip for solo development
 
-## Optional / situational
+| Rule                                       | Reason to skip                              |
+| ------------------------------------------ | ------------------------------------------- |
+| **Require approvals**                      | No other reviewers                          |
+| **Dismiss stale approvals**                | Irrelevant without approvals                |
+| **Require conversation resolution**        | Only meaningful when others leave comments  |
 
-- **Require signed commits** — cryptographic proof of authorship; good for auditability but has setup overhead
-- **Allow deletions: OFF** (default) — keep off on `main` to prevent accidental branch deletion
-- **Allow force pushes: OFF** (default) — keep off on `main` to prevent history rewrites
-- **Lock branch** — only appropriate if `main` should be fully read-only (e.g. an archived project)
+## Optional
+
+| Rule                          | Notes                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| **Require signed commits**    | Cryptographic proof of authorship; good for auditability, has setup overhead |
+| **Allow deletions: OFF**      | Default — keep off to prevent accidental branch deletion                 |
+| **Allow force pushes: OFF**   | Default — keep off to prevent history rewrites on `main`                 |
 
 ## Reference
 

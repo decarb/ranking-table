@@ -75,6 +75,24 @@ Main                          CommandIOApp wiring + decline CLI options
 
 `InputParser` is the only effectful algebra; `RankingCalculator` and `OutputFormatter` are pure traits with no `F[_]`. `Program` only requires `Functor` to `map` the parser result through the two pure steps.
 
+Test suites mirror the source structure:
+
+```
+input/InputParserSuite              CatsEffectSuite (effectful)
+calculator/RankingCalculatorSuite   FunSuite (pure)
+output/OutputFormatterSuite         FunSuite (pure)
+ProgramSuite                        CatsEffectSuite (end-to-end through Program)
+IntegrationSuite                    CatsEffectSuite (CLI wiring through Main)
+```
+
+## Documentation
+
+- `README.md` — usage, architecture overview, stack, development summary
+- `docs/development.md` — full development history and rationale for each design decision
+- `docs/ci.md` — CI workflow configuration and branch strategy
+- `docs/release.md` — release process, Dockerfile stages, running released artifacts
+- `docs/branch-protection.md` — recommended branch protection rules
+
 ## Workflow
 
 Before committing, always run in this order:
@@ -83,7 +101,7 @@ Before committing, always run in this order:
 2. `scala-cli fix --power .` — lint/fix
 3. `scala-cli fmt .` — format
 4. `scala-cli test .` — all tests must pass
-5. Check that `CLAUDE.md` and `docs/` are consistent with any code changes
+5. Check that `README.md`, `CLAUDE.md`, and `docs/` are consistent with any code changes
 6. `git add` all modified files (code, docs, formatted sources)
 7. `git status` — confirm everything is staged, nothing unexpected
 8. `git commit` — only if all steps above succeed
