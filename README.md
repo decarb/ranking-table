@@ -33,6 +33,17 @@ Expected output:
 **Requirements:** [Scala CLI](https://scala-cli.virtuslab.org/install) and Java 21+. No other
 setup is needed — Scala CLI downloads all dependencies on first run.
 
+**Prefer Docker?** No Scala CLI or JVM required — build the image once and pipe input directly:
+
+```bash
+docker build -t ranking-table .
+echo "Lions 3, Snakes 3
+Tarantulas 1, FC Awesome 0
+Lions 1, FC Awesome 1
+Tarantulas 3, Snakes 1
+Lions 4, Grouches 0" | docker run --rm -i ranking-table
+```
+
 ## Usage
 
 Four input modes are supported. All write to stdout unless `--output-file` is given.

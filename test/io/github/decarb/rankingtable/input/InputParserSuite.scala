@@ -60,3 +60,28 @@ class InputParserSuite extends CatsEffectSuite:
       assert(result.isLeft)
     }
   }
+
+  test("trim leading and trailing whitespace from line") {
+    parser.parseLine("  Lions 3, Snakes 1  ").map { r =>
+      assertEquals(r.homeTeam, TeamName("Lions"))
+      assertEquals(r.awayTeam, TeamName("Snakes"))
+    }
+  }
+
+  test("trim whitespace from team names") {
+    parser.parseLine("  FC Awesome  3,   Snakes 1").map { r =>
+      assertEquals(r.homeTeam, TeamName("FC Awesome"))
+    }
+  }
+
+  test("fail on negative score") {
+    parser.parseLine("Lions -1, Snakes 3").attempt.map { result =>
+      assert(result.isLeft)
+    }
+  }
+
+  test("fail on whitespace-only team name") {
+    parser.parseLine("   3, Snakes 1").attempt.map { result =>
+      assert(result.isLeft)
+    }
+  }

@@ -20,7 +20,7 @@ object InputParser:
       parseLineE(line).liftTo[F]
 
     private def parseLineE(line: String): Either[Throwable, GameResult] =
-      line.split(", ", 2).toList match
+      line.trim.split(", ", 2).toList match
         case homeStr :: awayStr :: Nil =>
           for
             home <- parseTeamScore(homeStr)
@@ -36,8 +36,11 @@ object InputParser:
       if lastSpace <= 0 then
         Left(ParseError(s"Expected 'TeamName score' but got: '$s'"))
       else
-        val name     = s.substring(0, lastSpace)
+        val name     = s.substring(0, lastSpace).trim
         val scoreStr = s.substring(lastSpace + 1)
-        scoreStr.toIntOption match
-          case Some(n) => Right((TeamName(name), Score(n)))
-          case None    => Left(ParseError(s"Invalid score '$scoreStr' in: '$s'"))
+        if name.isEmpty then
+          Left(ParseError(s"Expected 'TeamName score' but got: '$s'"))
+        else
+          scoreStr.toIntOption.filter(_ >= 0) match
+            case Some(n) => Right((TeamName(name), Score(n)))
+            case None    => Left(ParseError(s"Invalid score '$scoreStr' in: '$s'"))
