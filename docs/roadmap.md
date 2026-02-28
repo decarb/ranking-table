@@ -153,7 +153,7 @@ scala-cli run .
 
 ---
 
-## PR 4: Inline validation in interactive mode
+## PR 4: Inline validation in interactive mode ✅
 
 ### Context
 
@@ -320,6 +320,6 @@ cat results.txt | docker run --rm -i ranking-table
 | 1  | Workflow docs | `CLAUDE.md`, `.github/pull_request_template.md` | ✅ Done |
 | 2  | Output file support | `Main.scala`, `CLAUDE.md` | ✅ Done |
 | 3  | Interactive stdin | `Main.scala`, `CLAUDE.md` | ✅ Done |
-| 4  | Inline interactive validation | `Main.scala` | Pending |
+| 4  | Inline interactive validation | `Main.scala` | ✅ Done |
 | 5  | Test improvements | `IntegrationSuite` rename + new *(separate session)* | Pending |
 | 6  | Docker + release | `Dockerfile`, `release.yml`, `docs/release.md`, `CLAUDE.md` | Pending |
