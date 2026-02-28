@@ -7,7 +7,7 @@ League ranking table CLI — a backend coding test solution written in Scala 3 u
 ## Commands
 
 ```bash
-# Run (stdin)
+# Run (interactive — enter games one at a time, empty line to finish)
 scala-cli run .
 
 # Run (file)
