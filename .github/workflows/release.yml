@@ -44,3 +44,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: build-output/ranking-table.jar
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Docker** (no JDK required)
+            ```
+            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            docker run --rm -it ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```
+
+            **JAR** (requires Java 21+)
+            ```
+            java -jar ranking-table.jar
+            ```
