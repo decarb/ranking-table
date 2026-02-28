@@ -17,8 +17,15 @@ object Main extends CommandIOApp(
   private val inputFileOpt: Opts[Option[Path]] =
     Opts.argument[Path]("input-file").orNone
 
+  private val outputFileOpt: Opts[Option[Path]] =
+    Opts.option[Path](
+      "output-file",
+      short = "o",
+      help = "Write output to file instead of stdout"
+    ).orNone
+
   def main: Opts[IO[ExitCode]] =
-    inputFileOpt.map { maybeFile =>
+    (inputFileOpt, outputFileOpt).mapN { (maybeInput, maybeOutput) =>
       val program = Program.make[IO](
         InputParser.make[IO],
         RankingCalculator.make,
@@ -26,11 +33,22 @@ object Main extends CommandIOApp(
       )
 
       for
-        lines  <- readLines(maybeFile)
+        lines  <- readLines(maybeInput)
         output <- program.run(lines)
-        _      <- output.traverse_(IO.println)
+        _      <- writeOutput(output, maybeOutput)
       yield ExitCode.Success
     }
+
+  private def writeOutput(lines: List[String], maybeFile: Option[Path]): IO[Unit] =
+    maybeFile match
+      case Some(path) =>
+        IO.blocking {
+          val pw = new java.io.PrintWriter(path.toFile)
+          try lines.foreach(pw.println)
+          finally pw.close()
+        }
+      case None =>
+        lines.traverse_(IO.println)
 
   private def readLines(maybeFile: Option[Path]): IO[List[String]] =
     maybeFile match
