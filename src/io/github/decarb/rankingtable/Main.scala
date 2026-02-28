@@ -26,14 +26,11 @@ object Main extends CommandIOApp(
 
   def main: Opts[IO[ExitCode]] =
     (inputFileOpt, outputFileOpt).mapN { (maybeInput, maybeOutput) =>
-      val program = Program.make[IO](
-        InputParser.make[IO],
-        RankingCalculator.make,
-        OutputFormatter.make
-      )
+      val parser  = InputParser.make[IO]
+      val program = Program.make[IO](parser, RankingCalculator.make, OutputFormatter.make)
 
       for
-        lines  <- readLines(maybeInput)
+        lines  <- readLines(maybeInput, parser)
         output <- program.run(lines)
         _      <- writeOutput(output, maybeOutput)
       yield ExitCode.Success
@@ -50,13 +47,13 @@ object Main extends CommandIOApp(
       case None =>
         lines.traverse_(IO.println)
 
-  private def readLines(maybeFile: Option[Path]): IO[List[String]] =
+  private def readLines(maybeFile: Option[Path], parser: InputParser[IO]): IO[List[String]] =
     maybeFile match
       case Some(path) => readLinesFromFile(path)
       case None       =>
         IO.blocking(System.console()).flatMap {
           case null    => readLinesFromStdin
-          case console => readLinesInteractive(console)
+          case console => readLinesInteractive(console, parser)
         }
 
   private def readLinesFromFile(path: Path): IO[List[String]] =
@@ -69,11 +66,25 @@ object Main extends CommandIOApp(
   private def readLinesFromStdin: IO[List[String]] =
     IO.blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty))
 
-  private def readLinesInteractive(console: java.io.Console): IO[List[String]] =
+  private def readLinesInteractive(
+    console: java.io.Console,
+    parser: InputParser[IO]
+  ): IO[List[String]] =
     IO.println("Enter game results (one per line, empty line to finish):") *>
-      IO.blocking {
-        Iterator
-          .continually(console.readLine("> "))
-          .takeWhile(line => line != null && line.nonEmpty)
-          .toList
-      }
+      readLoop(console, parser, acc = List.empty)
+
+  private def readLoop(
+    console: java.io.Console,
+    parser: InputParser[IO],
+    acc: List[String]
+  ): IO[List[String]] =
+    IO.blocking(console.readLine("> ")).flatMap {
+      case null | "" => IO.pure(acc.reverse)
+      case line      =>
+        parser.parseLine(line).attempt.flatMap {
+          case Right(_) => readLoop(console, parser, line :: acc)
+          case Left(e)  =>
+            IO.println(s"  Error: ${e.getMessage}. Try again.") *>
+              readLoop(console, parser, acc)
+        }
+    }
