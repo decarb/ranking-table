@@ -61,3 +61,7 @@ class GameResultLineParseSuite extends FunSuite:
   test("fail on whitespace-only team name") {
     assert(parse("   3, Snakes 1").isLeft)
   }
+
+  test("fail when no space separates team name from score") {
+    assert(parse("Lions3, Snakes 1").isLeft)
+  }

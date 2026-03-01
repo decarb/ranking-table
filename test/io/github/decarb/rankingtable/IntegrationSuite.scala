@@ -56,3 +56,35 @@ class IntegrationSuite extends CatsEffectSuite:
       exitCode  <- run(inputFile.toString)
     yield assertEquals(exitCode, ExitCode.Error)
   }
+
+  test("returns success with empty output for empty input file") {
+    for
+      inputFile  <- IO.blocking(Files.createTempFile("input", ".txt"))
+      outputFile <- IO.blocking(Files.createTempFile("output", ".txt"))
+      exitCode   <- run(inputFile.toString, "--output-file", outputFile.toString)
+      content    <- IO.blocking(Files.readString(outputFile))
+    yield
+      assertEquals(exitCode, ExitCode.Success)
+      assertEquals(content, "")
+  }
+
+  test("returns error exit code when input file does not exist") {
+    for exitCode <- run("/nonexistent/path/input.txt")
+    yield assertEquals(exitCode, ExitCode.Error)
+  }
+
+  test("succeeds without output file") {
+    for
+      inputFile <- IO.blocking(Files.createTempFile("input", ".txt"))
+      _         <- IO.blocking(Files.writeString(inputFile, "Lions 3, Snakes 3"))
+      exitCode  <- run(inputFile.toString)
+    yield assertEquals(exitCode, ExitCode.Success)
+  }
+
+  test("returns error exit code when output file parent directory does not exist") {
+    for
+      inputFile <- IO.blocking(Files.createTempFile("input", ".txt"))
+      _         <- IO.blocking(Files.writeString(inputFile, "Lions 3, Snakes 3"))
+      exitCode  <- run(inputFile.toString, "--output-file", "/nonexistent/dir/output.txt")
+    yield assertEquals(exitCode, ExitCode.Error)
+  }

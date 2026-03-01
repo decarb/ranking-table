@@ -10,8 +10,16 @@ class RankingCalculatorSuite extends FunSuite:
   private def game(home: String, hs: Int, away: String, as: Int): GameResult =
     GameResult(TeamName(home), Score(hs), TeamName(away), Score(as))
 
-  test("win awards 3 points to winner and 0 to loser") {
+  test("home win awards 3 points to home team and 0 to away team") {
     val ranked = calculator.calculate(List(game("Lions", 3, "Snakes", 1)))
+    val lions  = ranked.find(_.team == TeamName("Lions")).getOrElse(fail("Lions not in rankings"))
+    val snakes = ranked.find(_.team == TeamName("Snakes")).getOrElse(fail("Snakes not in rankings"))
+    assertEquals(lions.points, 3)
+    assertEquals(snakes.points, 0)
+  }
+
+  test("away win awards 3 points to away team and 0 to home team") {
+    val ranked = calculator.calculate(List(game("Snakes", 1, "Lions", 3)))
     val lions  = ranked.find(_.team == TeamName("Lions")).getOrElse(fail("Lions not in rankings"))
     val snakes = ranked.find(_.team == TeamName("Snakes")).getOrElse(fail("Snakes not in rankings"))
     assertEquals(lions.points, 3)
@@ -72,6 +80,17 @@ class RankingCalculatorSuite extends FunSuite:
     val tarantulas =
       ranked.find(_.team == TeamName("Tarantulas")).getOrElse(fail("Tarantulas not in rankings"))
     assertEquals(tarantulas.points, 6)
+  }
+
+  test("empty input produces empty rankings") {
+    assertEquals(calculator.calculate(Nil), Nil)
+  }
+
+  test("team names are case-sensitive") {
+    val ranked = calculator.calculate(List(game("Lions", 3, "lions", 1)))
+    assertEquals(ranked.length, 2)
+    assert(ranked.exists(_.team == TeamName("Lions")))
+    assert(ranked.exists(_.team == TeamName("lions")))
   }
 
   test("full sample data produces correct standings") {

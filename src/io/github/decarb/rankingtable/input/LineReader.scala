@@ -41,7 +41,7 @@ object LineReader:
       case line      =>
         validate(line) match
           case Right(_) => readLoop(console, validate, line :: acc)
-          case Left(e)  =>
-            Sync[F].delay(println(s"  Error: ${e.getMessage}. Try again.")) *>
+          case Left(_)  =>
+            Sync[F].delay(println(s"  Error: could not parse line. Try again.")) *>
               readLoop(console, validate, acc)
     }
