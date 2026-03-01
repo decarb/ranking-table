@@ -106,6 +106,8 @@ Before committing, always run in this order:
 7. `git status` — confirm everything is staged, nothing unexpected
 8. `git commit` — only if all steps above succeed
 
+When opening a pull request, use the template in `.github/pull_request_template.md`. The checklist covers only what CI cannot enforce — docs consistency and test coverage.
+
 ## Git conventions
 
 Commits use conventional commit format with a bulleted body:
