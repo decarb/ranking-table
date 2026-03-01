@@ -4,51 +4,32 @@ import cats.effect.kernel.Sync
 import cats.syntax.all.*
 import java.nio.file.Path
 
-trait LineReader[F[_], A]:
-  def read: F[A]
+trait LineReader[F[_]]:
+  def read: F[List[String]]
 
 object LineReader:
 
-  def make[F[_]: Sync, A: LineParseable](maybeFile: Option[Path]): LineReader[F, List[A]] =
-    new Live(maybeFile)
+  def fromFile[F[_]: Sync](path: Path): LineReader[F] =
+    new Live(Sync[F].blocking {
+      val src = scala.io.Source.fromFile(path.toFile)
+      try src.getLines().toList.filter(_.nonEmpty)
+      finally src.close()
+    })
 
-  final private class Live[F[_]: Sync, A: LineParseable](
-    maybeFile: Option[Path]
-  ) extends LineReader[F, List[A]]:
+  def fromStdin[F[_]: Sync]: LineReader[F] =
+    new Live(Sync[F].blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty)))
 
-    def read: F[List[A]] =
-      readRawLines.flatMap(_.traverse(LineParseable[A].parseLine(_).liftTo[F]))
-
-    private def readRawLines: F[List[String]] =
-      maybeFile match
-        case Some(path) => readLinesFromFile(path)
-        case None       =>
-          Sync[F].blocking(System.console()).flatMap {
-            case null    => readLinesFromStdin
-            case console => readLinesInteractive(console)
-          }
-
-    private def readLinesFromFile(path: Path): F[List[String]] =
-      Sync[F].blocking {
-        val src = scala.io.Source.fromFile(path.toFile)
-        try src.getLines().toList.filter(_.nonEmpty)
-        finally src.close()
-      }
-
-    private def readLinesFromStdin: F[List[String]] =
-      Sync[F].blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty))
-
-    private def readLinesInteractive(console: java.io.Console): F[List[String]] =
+  def interactive[F[_]: Sync](console: java.io.Console): LineReader[F] =
+    new Live(
       Sync[F].delay(println("Enter game results (one per line, empty line to finish):")) *>
-        readLoop(console, acc = List.empty)
+        readLoop(console, List.empty)
+    )
 
-    private def readLoop(console: java.io.Console, acc: List[String]): F[List[String]] =
-      Sync[F].blocking(console.readLine("> ")).flatMap {
-        case null | "" => Sync[F].pure(acc.reverse)
-        case line      =>
-          LineParseable[A].parseLine(line) match
-            case Right(_) => readLoop(console, line :: acc)
-            case Left(e)  =>
-              Sync[F].delay(println(s"  Error: ${e.getMessage}. Try again.")) *>
-                readLoop(console, acc)
-      }
+  final private class Live[F[_]](effect: F[List[String]]) extends LineReader[F]:
+    def read: F[List[String]] = effect
+
+  private def readLoop[F[_]: Sync](console: java.io.Console, acc: List[String]): F[List[String]] =
+    Sync[F].blocking(console.readLine("> ")).flatMap {
+      case null | "" => Sync[F].pure(acc.reverse)
+      case line      => readLoop(console, line :: acc)
+    }

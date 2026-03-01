@@ -154,9 +154,11 @@ a tagless-final algebra would add `F[_]` parameters that serve no purpose. It is
 with a single `Live` implementation.
 
 Parsing and rendering are expressed as typeclasses (`LineParseable[A]`, `LineRenderable[A]`)
-rather than effectful algebras because neither operation requires `F[_]`. `LineReader` resolves
-`LineParseable[A]` implicitly and lifts parse errors into `F` at the I/O boundary. Adding a new
-data type requires only a new `given` instance — no algebra changes.
+rather than effectful algebras because neither operation requires `F[_]`. `Main` calls them
+explicitly — `LineParseable[GameResult].parseLine` after reading raw lines and
+`LineRenderable[RankedEntry].renderLine` before writing — making each transformation step
+visible in the wiring code. Adding a new data type requires only a new `given` instance — no
+algebra changes.
 
 `Main` composes all stages inline in its `for` comprehension. There is no intermediate
 orchestrator — the pipeline is short enough to read directly, and each stage is already
@@ -202,7 +204,7 @@ scala-cli test .
 
 ## Development
 
-The solution was built across ten sequential stages. Each was independently shippable — no
+The solution was built across eleven sequential stages. Each was independently shippable — no
 stage depended on a later one.
 
 | Stage | What changed                 | Key decision                                                       |
@@ -217,6 +219,7 @@ stage depended on a later one.
 | 8     | Architecture cleanup         | Extract `RankingIO`; drop `Program`; clean error output to stderr  |
 | 9     | I/O algebras                 | Split `RankingIO` into `LineReader[F]` and `ResultWriter[F]`       |
 | 10    | Typeclasses                  | `LineParseable[A]`, `LineRenderable[A]`; drop `InputParser` and `OutputFormatter` |
+| 11    | Narrow algebras              | Strip type params from `LineReader`/`ResultWriter`; routing and dispatch move to `Main` |
 
 See [docs/development.md](docs/development.md) for the full rationale behind each stage.
 

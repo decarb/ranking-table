@@ -74,7 +74,7 @@ output/ResultWriter[F]        writeLines — file or stdout         (Sync)
 Main                          CommandIOApp wiring + decline CLI options
 ```
 
-`LineReader` and `ResultWriter` are effectful algebras. `RankingCalculator` is a pure trait with no `F[_]`. Parsing and rendering are typeclasses — `LineParseable[A]` and `LineRenderable[A]` — resolved implicitly by the I/O algebras. `Main` composes all stages inline.
+`LineReader` and `ResultWriter` are effectful algebras. `RankingCalculator` is a pure trait with no `F[_]`. Parsing and rendering are typeclasses — `LineParseable[A]` and `LineRenderable[A]` — called explicitly in `Main` between the I/O steps. `Main` owns the routing (file vs stdin vs interactive; file vs stdout) and composes all stages inline.
 
 Test suites mirror the source structure:
 
