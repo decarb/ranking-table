@@ -1,6 +1,7 @@
 package io.github.decarb.rankingtable
 
 import cats.effect.{ExitCode, IO}
+import cats.effect.std.Console
 import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.*
@@ -26,65 +27,15 @@ object Main extends CommandIOApp(
 
   def main: Opts[IO[ExitCode]] =
     (inputFileOpt, outputFileOpt).mapN { (maybeInput, maybeOutput) =>
-      val parser  = InputParser.make[IO]
-      val program = Program.make[IO](parser, RankingCalculator.make, OutputFormatter.make)
+      val parser     = InputParser.make[IO]
+      val calculator = RankingCalculator.make
+      val formatter  = OutputFormatter.make
 
-      for
-        lines  <- readLines(maybeInput, parser)
-        output <- program.run(lines)
-        _      <- writeOutput(output, maybeOutput)
-      yield ExitCode.Success
-    }
-
-  private def writeOutput(lines: List[String], maybeFile: Option[Path]): IO[Unit] =
-    maybeFile match
-      case Some(path) =>
-        IO.blocking {
-          val pw = new java.io.PrintWriter(path.toFile)
-          try lines.foreach(pw.println)
-          finally pw.close()
-        }
-      case None =>
-        lines.traverse_(IO.println)
-
-  private def readLines(maybeFile: Option[Path], parser: InputParser[IO]): IO[List[String]] =
-    maybeFile match
-      case Some(path) => readLinesFromFile(path)
-      case None       =>
-        IO.blocking(System.console()).flatMap {
-          case null    => readLinesFromStdin
-          case console => readLinesInteractive(console, parser)
-        }
-
-  private def readLinesFromFile(path: Path): IO[List[String]] =
-    IO.blocking {
-      val src = scala.io.Source.fromFile(path.toFile)
-      try src.getLines().toList.filter(_.nonEmpty)
-      finally src.close()
-    }
-
-  private def readLinesFromStdin: IO[List[String]] =
-    IO.blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty))
-
-  private def readLinesInteractive(
-    console: java.io.Console,
-    parser: InputParser[IO]
-  ): IO[List[String]] =
-    IO.println("Enter game results (one per line, empty line to finish):") *>
-      readLoop(console, parser, acc = List.empty)
-
-  private def readLoop(
-    console: java.io.Console,
-    parser: InputParser[IO],
-    acc: List[String]
-  ): IO[List[String]] =
-    IO.blocking(console.readLine("> ")).flatMap {
-      case null | "" => IO.pure(acc.reverse)
-      case line      =>
-        parser.parseLine(line).attempt.flatMap {
-          case Right(_) => readLoop(console, parser, line :: acc)
-          case Left(e)  =>
-            IO.println(s"  Error: ${e.getMessage}. Try again.") *>
-              readLoop(console, parser, acc)
-        }
+      (for
+        lines   <- RankingIO.readLines(maybeInput, parser)
+        results <- parser.parseLines(lines)
+        _ <- RankingIO.writeOutput(formatter.format(calculator.calculate(results)), maybeOutput)
+      yield ExitCode.Success).handleErrorWith { e =>
+        Console[IO].errorln(s"Error: ${e.getMessage}").as(ExitCode.Error)
+      }
     }

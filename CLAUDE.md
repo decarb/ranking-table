@@ -69,11 +69,11 @@ input/InputParser[F]          parse lines → F[List[GameResult]]  (ApplicativeT
 calculator/RankingCalculator  GameResult  → List[RankedEntry]    (pure)
 output/OutputFormatter        List[RankedEntry] → List[String]   (pure)
 
-Program[F]                    composes the three (requires Functor)
+RankingIO                     readLines / writeOutput (file, piped stdin, interactive TTY)
 Main                          CommandIOApp wiring + decline CLI options
 ```
 
-`InputParser` is the only effectful algebra; `RankingCalculator` and `OutputFormatter` are pure traits with no `F[_]`. `Program` only requires `Functor` to `map` the parser result through the two pure steps.
+`InputParser` is the only effectful algebra; `RankingCalculator` and `OutputFormatter` are pure traits with no `F[_]`. `Main` composes all three stages inline; `RankingIO` owns the I/O boundary.
 
 Test suites mirror the source structure:
 
@@ -81,7 +81,7 @@ Test suites mirror the source structure:
 input/InputParserSuite              CatsEffectSuite (effectful)
 calculator/RankingCalculatorSuite   FunSuite (pure)
 output/OutputFormatterSuite         FunSuite (pure)
-ProgramSuite                        CatsEffectSuite (end-to-end through Program)
+RankingIOSuite                      CatsEffectSuite (file reading and writing)
 IntegrationSuite                    CatsEffectSuite (CLI wiring through Main)
 ```
 

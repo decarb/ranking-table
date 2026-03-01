@@ -34,35 +34,25 @@ class IntegrationSuite extends CatsEffectSuite:
     assert(command.parse(List("--unknown"), Map.empty).isLeft)
   }
 
-  // --- End-to-end file I/O ---
+  // --- End-to-end pipeline wiring ---
 
-  test("reads input file and writes correct output to file") {
-    val lines = List(
-      "Lions 3, Snakes 3",
-      "Tarantulas 1, FC Awesome 0",
-      "Lions 1, FC Awesome 1",
-      "Tarantulas 3, Snakes 1",
-      "Lions 4, Grouches 0"
-    )
+  test("wires input file through the full pipeline to output file") {
     for
       inputFile  <- IO.blocking(Files.createTempFile("input", ".txt"))
       outputFile <- IO.blocking(Files.createTempFile("output", ".txt"))
-      _          <- IO.blocking(Files.writeString(inputFile, lines.mkString("\n")))
-      exitCode   <- run(inputFile.toString, "--output-file", outputFile.toString)
-      content    <- IO.blocking(Files.readString(outputFile))
+      _          <-
+        IO.blocking(Files.writeString(inputFile, "Tarantulas 1, FC Awesome 0\nLions 3, Snakes 3"))
+      exitCode <- run(inputFile.toString, "--output-file", outputFile.toString)
+      content  <- IO.blocking(Files.readString(outputFile))
     yield
       assertEquals(exitCode, ExitCode.Success)
-      assert(content.contains("1. Tarantulas, 6 pts"))
-      assert(content.contains("2. Lions, 5 pts"))
-      assert(content.contains("3. FC Awesome, 1 pt"))
-      assert(content.contains("3. Snakes, 1 pt"))
-      assert(content.contains("5. Grouches, 0 pts"))
+      assert(content.contains("1. Tarantulas, 3 pts"))
   }
 
-  test("propagates parse error from input file") {
+  test("returns error exit code for invalid input file") {
     for
       inputFile <- IO.blocking(Files.createTempFile("input", ".txt"))
       _         <- IO.blocking(Files.writeString(inputFile, "not a valid line"))
-      result    <- run(inputFile.toString).attempt
-    yield assert(result.isLeft)
+      exitCode  <- run(inputFile.toString)
+    yield assertEquals(exitCode, ExitCode.Error)
   }

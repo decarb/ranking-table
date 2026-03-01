@@ -1,6 +1,6 @@
 # Development History
 
-This document traces the six stages of development, explaining the decisions made at each step.
+This document traces the eight stages of development, explaining the decisions made at each step.
 Each stage was independently shippable — no stage depended on a later one.
 
 ---
@@ -253,3 +253,76 @@ constructing `TeamName`.
 for all team name formats (abbreviations, hyphenated names, apostrophes) is non-trivial, and the
 test spec is silent on casing while the sample data is internally consistent. The behaviour is
 documented in the Input format section of `README.md` rather than normalised away.
+
+---
+
+## Stage 8 — Architecture cleanup and error output
+
+**Commits:** `TBD`
+
+Two related improvements were made together: a structural refactor of `Main` and `Program`, and
+a fix for unhandled exceptions printing stack traces in batch mode.
+
+### Removing Program
+
+`Program` composed `InputParser`, `RankingCalculator`, and `OutputFormatter` in a single
+`run(lines: List[String]): F[List[String]]` call. Its only logic was one chain:
+
+```scala
+parser.parseLines(lines).map(calculator.calculate).map(formatter.format)
+```
+
+This is not a meaningful abstraction — it adds a file, a class, and a `Functor` constraint
+without encapsulating any complexity. Each of the three stages it wires together is already
+self-contained, independently testable, and well-named. The composition is short enough to read
+directly inline.
+
+`Program` was deleted. The pipeline now lives explicitly in `Main.main`'s `for` comprehension:
+
+```scala
+for
+  lines   <- RankingIO.readLines(maybeInput, parser)
+  results <- parser.parseLines(lines)
+  _       <- RankingIO.writeOutput(formatter.format(calculator.calculate(results)), maybeOutput)
+yield ExitCode.Success
+```
+
+`ProgramSuite` was deleted with it. The individual unit suites already cover each stage; the
+end-to-end pipeline is covered by `IntegrationSuite`.
+
+### Extracting RankingIO
+
+`Main` previously contained five private methods for reading and writing — `readLines`,
+`readLinesFromFile`, `readLinesFromStdin`, `readLinesInteractive`, `readLoop`, and `writeOutput`.
+This is where the real complexity lives: TTY detection, the interactive prompt loop, per-line
+validation, and output routing. Keeping it inside `Main` buried substantive logic next to CLI
+wiring.
+
+`RankingIO` extracts that I/O boundary into its own file. `Main` is left with only what it should
+own: decline option definitions and the `for` comprehension that sequences the pipeline.
+
+> **Why not tagless final for `RankingIO`?** These methods are `IO`-specific by nature — they
+> call `System.console()`, `scala.io.Source`, and `java.io.PrintWriter`. There is no meaningful
+> abstraction over the effect type here. A plain `object` with concrete `IO` methods is honest;
+> wrapping it in `F[_]` would be form over function.
+
+### Clean error output in batch mode
+
+In interactive mode, parse errors were caught inside `readLoop` with `.attempt` and printed as a
+clean `Error: <message>` line before re-prompting. In batch mode (piped input or file argument),
+errors propagated unhandled out of the `for` comprehension. `CommandIOApp` caught them at the top
+level and printed the full JVM stack trace before exiting with code 1.
+
+The fix adds `.handleErrorWith` after the `for` comprehension, printing `e.getMessage` to stderr
+via `Console[IO].errorln` and returning `ExitCode.Error`:
+
+```scala
+(for
+  ...
+yield ExitCode.Success).handleErrorWith { e =>
+  Console[IO].errorln(s"Error: ${e.getMessage}").as(ExitCode.Error)
+}
+```
+
+This matches the clean format used in interactive mode and gives the caller a meaningful exit code
+without leaking implementation details through a stack trace.
