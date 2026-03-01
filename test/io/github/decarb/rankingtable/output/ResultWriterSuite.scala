@@ -22,3 +22,10 @@ class ResultWriterSuite extends CatsEffectSuite:
       written <- IO.blocking(Files.readString(file))
     yield assertEquals(written, "")
   }
+
+  test("write to path in non-existent directory raises error") {
+    val path = java.nio.file.Path.of("/nonexistent/dir/output.txt")
+    ResultWriter.toFile[IO](path).write(List("1. Tarantulas, 6 pts")).attempt.map { result =>
+      assert(result.isLeft)
+    }
+  }
