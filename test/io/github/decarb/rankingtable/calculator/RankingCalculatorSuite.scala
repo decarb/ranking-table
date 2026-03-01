@@ -5,23 +5,23 @@ import io.github.decarb.rankingtable.domain.{GameResult, Score, TeamName}
 
 class RankingCalculatorSuite extends FunSuite:
 
-  val calculator = RankingCalculator.make
+  private val calculator = RankingCalculator.make
 
   private def game(home: String, hs: Int, away: String, as: Int): GameResult =
     GameResult(TeamName(home), Score(hs), TeamName(away), Score(as))
 
   test("win awards 3 points to winner and 0 to loser") {
     val ranked = calculator.calculate(List(game("Lions", 3, "Snakes", 1)))
-    val lions  = ranked.find(_.team == TeamName("Lions")).get
-    val snakes = ranked.find(_.team == TeamName("Snakes")).get
+    val lions  = ranked.find(_.team == TeamName("Lions")).getOrElse(fail("Lions not in rankings"))
+    val snakes = ranked.find(_.team == TeamName("Snakes")).getOrElse(fail("Snakes not in rankings"))
     assertEquals(lions.points, 3)
     assertEquals(snakes.points, 0)
   }
 
   test("draw awards 1 point to each team") {
     val ranked = calculator.calculate(List(game("Lions", 1, "Snakes", 1)))
-    val lions  = ranked.find(_.team == TeamName("Lions")).get
-    val snakes = ranked.find(_.team == TeamName("Snakes")).get
+    val lions  = ranked.find(_.team == TeamName("Lions")).getOrElse(fail("Lions not in rankings"))
+    val snakes = ranked.find(_.team == TeamName("Snakes")).getOrElse(fail("Snakes not in rankings"))
     assertEquals(lions.points, 1)
     assertEquals(snakes.points, 1)
   }
@@ -38,8 +38,9 @@ class RankingCalculatorSuite extends FunSuite:
       game("Lions", 4, "Grouches", 0)
     )
     val ranked    = calculator.calculate(results)
-    val fcAwesome = ranked.find(_.team == TeamName("FC Awesome")).get
-    val snakes    = ranked.find(_.team == TeamName("Snakes")).get
+    val fcAwesome =
+      ranked.find(_.team == TeamName("FC Awesome")).getOrElse(fail("FC Awesome not in rankings"))
+    val snakes = ranked.find(_.team == TeamName("Snakes")).getOrElse(fail("Snakes not in rankings"))
     assertEquals(fcAwesome.rank, snakes.rank)
   }
 
@@ -49,7 +50,8 @@ class RankingCalculatorSuite extends FunSuite:
       game("Lions", 4, "Grouches", 0)
     )
     val ranked   = calculator.calculate(results)
-    val grouches = ranked.find(_.team == TeamName("Grouches")).get
+    val grouches =
+      ranked.find(_.team == TeamName("Grouches")).getOrElse(fail("Grouches not in rankings"))
     // Lions(3pts)=1st, FC Awesome(1pt)=2nd, Snakes(1pt)=2nd, Grouches(0pts)=4th
     assertEquals(grouches.rank, 4)
   }
@@ -67,7 +69,8 @@ class RankingCalculatorSuite extends FunSuite:
       game("Tarantulas", 3, "Snakes", 1)      // Tarantulas: +3pts = 6pts
     )
     val ranked     = calculator.calculate(results)
-    val tarantulas = ranked.find(_.team == TeamName("Tarantulas")).get
+    val tarantulas =
+      ranked.find(_.team == TeamName("Tarantulas")).getOrElse(fail("Tarantulas not in rankings"))
     assertEquals(tarantulas.points, 6)
   }
 

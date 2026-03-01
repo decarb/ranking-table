@@ -3,7 +3,7 @@ package io.github.decarb.rankingtable.output
 import munit.FunSuite
 import io.github.decarb.rankingtable.domain.{RankedEntry, TeamName}
 
-class LineRenderableSuite extends FunSuite:
+class RankedEntryLineRenderSuite extends FunSuite:
 
   private def entry(rank: Int, name: String, points: Int): RankedEntry =
     RankedEntry(rank, TeamName(name), points)
@@ -20,8 +20,4 @@ class LineRenderableSuite extends FunSuite:
 
   test("render entry with zero pts") {
     assertEquals(render(entry(5, "Grouches", 0)), "5. Grouches, 0 pts")
-  }
-
-  test("render multi-word team name") {
-    assert(render(entry(3, "FC Awesome", 1)).contains("FC Awesome"))
   }

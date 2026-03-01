@@ -79,10 +79,10 @@ Main                          CommandIOApp wiring + decline CLI options
 Test suites mirror the source structure:
 
 ```
-input/LineParseableSuite            FunSuite (pure — parse logic and error cases)
+input/GameResultLineParseSuite      FunSuite (pure — parse logic and error cases)
 input/LineReaderSuite               CatsEffectSuite (file reading, empty filtering)
 calculator/RankingCalculatorSuite   FunSuite (pure)
-output/LineRenderableSuite          FunSuite (pure — rendering logic)
+output/RankedEntryLineRenderSuite   FunSuite (pure — rendering logic)
 output/ResultWriterSuite            CatsEffectSuite (file writing)
 IntegrationSuite                    CatsEffectSuite (CLI wiring through Main)
 ```
