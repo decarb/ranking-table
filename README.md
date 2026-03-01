@@ -128,12 +128,17 @@ are formatted as `1 pt` (singular) and `0 pts` / `2 pts` (plural).
 The processing pipeline has three stages:
 
 ```
-InputParser[F]    parse lines  →  F[List[GameResult]]   (can fail — ApplicativeThrow)
-RankingCalculator calculate    →  List[RankedEntry]      (pure)
-OutputFormatter   format       →  List[String]           (pure)
+LineReader[F]       read lines — file, piped stdin, and interactive TTY  (Sync)
+RankingCalculator   calculate  — List[GameResult]  →  List[RankedEntry]  (pure)
+ResultWriter[F]     write output — file or stdout                         (Sync)
+Main                CommandIOApp — CLI option parsing, wiring, entry point
+```
 
-RankingIO         readLines / writeOutput — file, piped stdin, and interactive TTY
-Main              CommandIOApp — CLI option parsing, wiring, entry point
+Line parsing and rendering are governed by typeclasses:
+
+```
+LineParseable[A]   String  →  Either[Throwable, A]   (pure)
+LineRenderable[A]  A       →  String                  (pure)
 ```
 
 Source lives under `src/io/github/decarb/rankingtable/` and tests under
@@ -141,14 +146,19 @@ Source lives under `src/io/github/decarb/rankingtable/` and tests under
 
 ### Tagless final, scoped to where effects are real
 
-`InputParser` is the only component that can fail: a malformed line must raise an error rather
-than be silently skipped. It is expressed as a tagless-final algebra over `F[_]: ApplicativeThrow`.
+`LineReader` and `ResultWriter` perform real I/O — file access, TTY detection, stdout — and use
+`F[_]: Sync`, the minimal constraint for blocking and suspending side effects.
 
-`RankingCalculator` and `OutputFormatter` are pure functions — no effects, no error handling, no
-IO. Expressing them as tagless-final algebras would add `F[_]` parameters that serve no purpose.
-They are plain traits with a single `Live` implementation.
+`RankingCalculator` is a pure function — no effects, no error handling, no IO. Expressing it as
+a tagless-final algebra would add `F[_]` parameters that serve no purpose. It is a plain trait
+with a single `Live` implementation.
 
-`Main` composes all three stages inline in its `for` comprehension. There is no intermediate
+Parsing and rendering are expressed as typeclasses (`LineParseable[A]`, `LineRenderable[A]`)
+rather than effectful algebras because neither operation requires `F[_]`. `LineReader` resolves
+`LineParseable[A]` implicitly and lifts parse errors into `F` at the I/O boundary. Adding a new
+data type requires only a new `given` instance — no algebra changes.
+
+`Main` composes all stages inline in its `for` comprehension. There is no intermediate
 orchestrator — the pipeline is short enough to read directly, and each stage is already
 independently tested.
 
@@ -175,15 +185,16 @@ Tests mirror the source package structure:
 
 | Suite                        | Style            | What it covers                                          |
 | ---------------------------- | ---------------- | ------------------------------------------------------- |
-| `input/InputParserSuite`     | `CatsEffectSuite` | Valid and invalid lines; error messages                |
+| `input/LineParseableSuite`   | `FunSuite`        | Valid and invalid lines; whitespace trimming; error messages |
+| `input/LineReaderSuite`      | `CatsEffectSuite` | File reading (lines, empty filtering)                  |
 | `calculator/RankingCalculatorSuite` | `FunSuite`  | Point accumulation, tie-breaking, rank numbering      |
-| `output/OutputFormatterSuite` | `FunSuite`      | Singular "pt" vs plural "pts"; rank prefixes           |
-| `RankingIOSuite`             | `CatsEffectSuite` | File reading (lines, empty filtering) and file writing |
+| `output/LineRenderableSuite` | `FunSuite`        | Singular "pt" vs plural "pts"; rank prefixes           |
+| `output/ResultWriterSuite`   | `CatsEffectSuite` | File writing                                           |
 | `IntegrationSuite`           | `CatsEffectSuite` | CLI arg parsing, pipeline wiring, error exit codes     |
 
-`InputParserSuite` and `RankingIOSuite` use `CatsEffectSuite` because they exercise effectful
-operations. The calculator and formatter suites use `FunSuite` — there is no reason to bring in
-an effect type for pure functions.
+`LineReaderSuite` and `ResultWriterSuite` use `CatsEffectSuite` because they exercise real I/O.
+`LineParseableSuite`, `LineRenderableSuite`, and `RankingCalculatorSuite` use `FunSuite` — there
+is no reason to bring in an effect type for pure functions.
 
 ```bash
 scala-cli test .
@@ -191,7 +202,7 @@ scala-cli test .
 
 ## Development
 
-The solution was built across seven sequential stages. Each was independently shippable — no
+The solution was built across ten sequential stages. Each was independently shippable — no
 stage depended on a later one.
 
 | Stage | What changed                 | Key decision                                                       |
@@ -204,6 +215,8 @@ stage depended on a later one.
 | 6     | Docker + release             | Three-stage Dockerfile; `scratch` isolates JAR from Bloop socket   |
 | 7     | Input boundary validation    | Trim whitespace at parse boundaries; reject negative scores        |
 | 8     | Architecture cleanup         | Extract `RankingIO`; drop `Program`; clean error output to stderr  |
+| 9     | I/O algebras                 | Split `RankingIO` into `LineReader[F]` and `ResultWriter[F]`       |
+| 10    | Typeclasses                  | `LineParseable[A]`, `LineRenderable[A]`; drop `InputParser` and `OutputFormatter` |
 
 See [docs/development.md](docs/development.md) for the full rationale behind each stage.
 
