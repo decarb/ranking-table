@@ -114,7 +114,7 @@ docker run --rm ranking-table --help
 
 ```bash
 echo "not a valid line" | docker run --rm -i ranking-table 2>&1
-# Error: Expected 'Team score, Team score' but got: 'not a valid line'
+# Error: Invalid format - expected 'TeamName score, TeamName score' but got: 'not a valid line'
 ```
 
 All six checks must pass before merging or tagging a release.

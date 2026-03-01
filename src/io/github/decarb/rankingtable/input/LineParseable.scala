@@ -12,6 +12,9 @@ object LineParseable:
 
   given LineParseable[GameResult] with
 
+    private def invalidFormat(expected: String, got: String) =
+      Left(ParseError(s"Invalid format - expected '$expected' but got: '$got'"))
+
     def parseLine(line: String): Either[Throwable, GameResult] =
       line.trim.split(", ", 2).toList match
         case homeStr :: awayStr :: Nil =>
@@ -21,17 +24,14 @@ object LineParseable:
             away <- parseTeamScore(awayStr)
             (awayName, awayScore) = away
           yield GameResult(homeName, homeScore, awayName, awayScore)
-        case _ =>
-          Left(ParseError(s"Expected 'Team score, Team score' but got: '$line'"))
+        case _ => invalidFormat("TeamName score, TeamName score", line)
 
     private def parseTeamScore(s: String): Either[Throwable, (TeamName, Score)] =
       val lastSpace = s.lastIndexOf(' ')
-      if lastSpace <= 0 then Left(ParseError(s"Expected 'TeamName score' but got: '$s'"))
+      val name      = if lastSpace > 0 then s.substring(0, lastSpace).trim else ""
+      if name.isEmpty then invalidFormat("TeamName score", s)
       else
-        val name     = s.substring(0, lastSpace).trim
         val scoreStr = s.substring(lastSpace + 1)
-        if name.isEmpty then Left(ParseError(s"Expected 'TeamName score' but got: '$s'"))
-        else
-          scoreStr.toIntOption.filter(_ >= 0) match
-            case Some(n) => Right((TeamName(name), Score(n)))
-            case None    => Left(ParseError(s"Invalid score '$scoreStr' in: '$s'"))
+        scoreStr.toIntOption.filter(_ >= 0) match
+          case Some(n) => Right((TeamName(name), Score(n)))
+          case None    => Left(ParseError(s"Invalid score '$scoreStr' in: '$s'"))
