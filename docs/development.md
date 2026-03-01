@@ -445,3 +445,86 @@ output/LineRenderableSuite FunSuite — renderLine formatting, singular/plural p
 `InputParserSuite` is deleted alongside `InputParser`. `LineReaderSuite` retains a local
 `given LineParseable[String]` to isolate I/O routing from parsing logic — the same technique
 used in `ResultWriterSuite` for `LineRenderable[String]`.
+
+---
+
+## Stage 11 — Narrow algebras
+
+**Commits:** _(this stage)_
+
+### Moving routing and typeclass dispatch to Main
+
+`LineReader[F, A]` and `ResultWriter[F, A]` each bundled two concerns that do not belong in a
+narrow I/O algebra:
+
+- **Routing** — deciding which I/O operation to perform based on `Option[Path]` or
+  `System.console()`. This is a wiring decision that depends on CLI arguments — the domain of
+  `Main`.
+- **Type dispatch** — resolving `LineParseable[A]` or `LineRenderable[A]` and applying the
+  conversion. This is a pure transformation step, not an I/O primitive.
+
+### Stripping type parameters from the algebras
+
+`LineReader[F, A]` becomes `LineReader[F]`. Three single-purpose smart constructors replace `make`:
+
+```scala
+trait LineReader[F[_]]:
+  def read: F[List[String]]
+
+LineReader.fromFile[F[_]: Sync](path: Path): LineReader[F]
+LineReader.fromStdin[F[_]: Sync]: LineReader[F]
+LineReader.interactive[F[_]: Sync](console: java.io.Console): LineReader[F]
+```
+
+`ResultWriter[F, A]` becomes `ResultWriter[F]`. Two single-purpose smart constructors replace `make`:
+
+```scala
+trait ResultWriter[F[_]]:
+  def write(lines: List[String]): F[Unit]
+
+ResultWriter.toFile[F[_]: Sync](path: Path): ResultWriter[F]
+ResultWriter.toStdout[F[_]: Sync]: ResultWriter[F]
+```
+
+### Routing and dispatch in Main
+
+`Main` pattern-matches on CLI arguments and `System.console()` to select the right constructor,
+then calls the typeclasses explicitly between the I/O steps:
+
+```scala
+val reader: IO[List[String]] = maybeInput match
+  case Some(path) => LineReader.fromFile[IO](path).read
+  case None       =>
+    IO.blocking(System.console()).flatMap {
+      case null    => LineReader.fromStdin[IO].read
+      case console => LineReader.interactive[IO](console).read
+    }
+
+val writer: List[String] => IO[Unit] = maybeOutput match
+  case Some(path) => ResultWriter.toFile[IO](path).write
+  case None       => ResultWriter.toStdout[IO].write
+
+for
+  raw     <- reader
+  results <- raw.traverse(LineParseable[GameResult].parseLine(_).liftTo[IO])
+  _       <- writer(calculator.calculate(results).map(LineRenderable[RankedEntry].renderLine))
+yield ExitCode.Success
+```
+
+The pipeline steps are now all visible in `Main`: read raw strings → parse to domain types →
+calculate → render to strings → write. Each algebra does exactly what its name says.
+
+### Trade-off: interactive validation
+
+The previous interactive loop re-prompted on parse errors inline, validating each line before
+accepting it. Stripping `LineParseable` from `LineReader` removes this — the interactive reader
+now collects all lines as strings, and errors surface at the parse step after input is complete.
+This is acceptable for a tool that processes small batch inputs; the clean separation outweighs
+the UX concession.
+
+### Test alignment
+
+`LineReaderSuite` drops the local `given LineParseable[String]` that was needed to satisfy the
+old type parameter — the reader now returns `List[String]` directly, so no parser is needed.
+`ResultWriterSuite` drops the corresponding `given LineRenderable[String]`. Both suites become
+simpler: they test only the I/O behaviour they are named for.

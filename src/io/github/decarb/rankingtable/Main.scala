@@ -8,8 +8,8 @@ import com.monovore.decline.effect.*
 import java.nio.file.Path
 import io.github.decarb.rankingtable.calculator.RankingCalculator
 import io.github.decarb.rankingtable.domain.{GameResult, RankedEntry}
-import io.github.decarb.rankingtable.input.LineReader
-import io.github.decarb.rankingtable.output.ResultWriter
+import io.github.decarb.rankingtable.input.{LineParseable, LineReader}
+import io.github.decarb.rankingtable.output.{LineRenderable, ResultWriter}
 
 object Main extends CommandIOApp(
   name = "ranking-table",
@@ -29,12 +29,23 @@ object Main extends CommandIOApp(
   def main: Opts[IO[ExitCode]] =
     (inputFileOpt, outputFileOpt).mapN { (maybeInput, maybeOutput) =>
       val calculator = RankingCalculator.make
-      val reader     = LineReader.make[IO, GameResult](maybeInput)
-      val writer     = ResultWriter.make[IO, RankedEntry](maybeOutput)
+
+      val reader: IO[List[String]] = maybeInput match
+        case Some(path) => LineReader.fromFile[IO](path).read
+        case None       =>
+          IO.blocking(System.console()).flatMap {
+            case null    => LineReader.fromStdin[IO].read
+            case console => LineReader.interactive[IO](console).read
+          }
+
+      val writer: List[String] => IO[Unit] = maybeOutput match
+        case Some(path) => ResultWriter.toFile[IO](path).write
+        case None       => ResultWriter.toStdout[IO].write
 
       (for
-        results <- reader.read
-        _       <- writer.write(calculator.calculate(results))
+        raw     <- reader
+        results <- raw.traverse(LineParseable[GameResult].parseLine(_).liftTo[IO])
+        _       <- writer(calculator.calculate(results).map(LineRenderable[RankedEntry].renderLine))
       yield ExitCode.Success).handleErrorWith { e =>
         Console[IO].errorln(s"Error: ${e.getMessage}").as(ExitCode.Error)
       }
