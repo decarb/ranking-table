@@ -19,17 +19,29 @@ object LineReader:
   def fromStdin[F[_]: Sync]: LineReader[F] =
     new Live(Sync[F].blocking(scala.io.Source.stdin.getLines().toList.filter(_.nonEmpty)))
 
-  def interactive[F[_]: Sync](console: java.io.Console): LineReader[F] =
+  def interactive[F[_]: Sync](
+    console: java.io.Console,
+    validate: String => Either[Throwable, ?]
+  ): LineReader[F] =
     new Live(
       Sync[F].delay(println("Enter game results (one per line, empty line to finish):")) *>
-        readLoop(console, List.empty)
+        readLoop(console, validate, List.empty)
     )
 
   final private class Live[F[_]](effect: F[List[String]]) extends LineReader[F]:
     def read: F[List[String]] = effect
 
-  private def readLoop[F[_]: Sync](console: java.io.Console, acc: List[String]): F[List[String]] =
+  private def readLoop[F[_]: Sync](
+    console: java.io.Console,
+    validate: String => Either[Throwable, ?],
+    acc: List[String]
+  ): F[List[String]] =
     Sync[F].blocking(console.readLine("> ")).flatMap {
       case null | "" => Sync[F].pure(acc.reverse)
-      case line      => readLoop(console, line :: acc)
+      case line      =>
+        validate(line) match
+          case Right(_) => readLoop(console, validate, line :: acc)
+          case Left(e)  =>
+            Sync[F].delay(println(s"  Error: ${e.getMessage}. Try again.")) *>
+              readLoop(console, validate, acc)
     }

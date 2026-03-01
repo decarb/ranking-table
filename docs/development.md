@@ -497,7 +497,7 @@ val reader: IO[List[String]] = maybeInput match
   case None       =>
     IO.blocking(System.console()).flatMap {
       case null    => LineReader.fromStdin[IO].read
-      case console => LineReader.interactive[IO](console).read
+      case console => LineReader.interactive[IO](console, LineParseable[GameResult].parseLine).read
     }
 
 val writer: List[String] => IO[Unit] = maybeOutput match
@@ -514,13 +514,13 @@ yield ExitCode.Success
 The pipeline steps are now all visible in `Main`: read raw strings → parse to domain types →
 calculate → render to strings → write. Each algebra does exactly what its name says.
 
-### Trade-off: interactive validation
+### Interactive validation
 
-The previous interactive loop re-prompted on parse errors inline, validating each line before
-accepting it. Stripping `LineParseable` from `LineReader` removes this — the interactive reader
-now collects all lines as strings, and errors surface at the parse step after input is complete.
-This is acceptable for a tool that processes small batch inputs; the clean separation outweighs
-the UX concession.
+The interactive loop re-prompts on parse errors inline, validating each line before accepting
+it. `LineReader` stays type-agnostic by accepting a `String => Either[Throwable, ?]` validator
+rather than a `LineParseable[A]` context bound — `Main` passes
+`LineParseable[GameResult].parseLine` at the call site. The loop sees only the `Either` result
+and the error message; the domain type never leaks into the algebra.
 
 ### Test alignment
 

@@ -35,7 +35,8 @@ object Main extends CommandIOApp(
         case None       =>
           IO.blocking(System.console()).flatMap {
             case null    => LineReader.fromStdin[IO].read
-            case console => LineReader.interactive[IO](console).read
+            case console =>
+              LineReader.interactive[IO](console, LineParseable[GameResult].parseLine).read
           }
 
       val writer: List[String] => IO[Unit] = maybeOutput match
