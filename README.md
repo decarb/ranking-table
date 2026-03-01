@@ -125,15 +125,15 @@ are formatted as `1 pt` (singular) and `0 pts` / `2 pts` (plural).
 
 ## Architecture
 
-The processing pipeline has three stages, composed by `Program`:
+The processing pipeline has three stages:
 
 ```
-InputParser[F]        parse lines  →  F[List[GameResult]]   (can fail — ApplicativeThrow)
-RankingCalculator     calculate    →  List[RankedEntry]      (pure)
-OutputFormatter       format       →  List[String]           (pure)
+InputParser[F]    parse lines  →  F[List[GameResult]]   (can fail — ApplicativeThrow)
+RankingCalculator calculate    →  List[RankedEntry]      (pure)
+OutputFormatter   format       →  List[String]           (pure)
 
-Program[F: Functor]   maps parser output through the two pure stages
-Main                  CommandIOApp — CLI parsing, IO wiring, entry point
+RankingIO         readLines / writeOutput — file, piped stdin, and interactive TTY
+Main              CommandIOApp — CLI option parsing, wiring, entry point
 ```
 
 Source lives under `src/io/github/decarb/rankingtable/` and tests under
@@ -148,9 +148,9 @@ than be silently skipped. It is expressed as a tagless-final algebra over `F[_]:
 IO. Expressing them as tagless-final algebras would add `F[_]` parameters that serve no purpose.
 They are plain traits with a single `Live` implementation.
 
-`Program` only needs to `map` the parser result through the two pure stages, so it requires
-`Functor` — not `Monad` or `IO`. This keeps the constraint honest and the component independently
-testable without a concrete effect type.
+`Main` composes all three stages inline in its `for` comprehension. There is no intermediate
+orchestrator — the pipeline is short enough to read directly, and each stage is already
+independently tested.
 
 ### Opaque types for domain newtypes
 
@@ -178,11 +178,12 @@ Tests mirror the source package structure:
 | `input/InputParserSuite`     | `CatsEffectSuite` | Valid and invalid lines; error messages                |
 | `calculator/RankingCalculatorSuite` | `FunSuite`  | Point accumulation, tie-breaking, rank numbering      |
 | `output/OutputFormatterSuite` | `FunSuite`      | Singular "pt" vs plural "pts"; rank prefixes           |
-| `ProgramSuite`               | `CatsEffectSuite` | End-to-end through `Program.make[IO]`                 |
-| `IntegrationSuite`           | `CatsEffectSuite` | CLI wiring through `Main`                             |
+| `RankingIOSuite`             | `CatsEffectSuite` | File reading (lines, empty filtering) and file writing |
+| `IntegrationSuite`           | `CatsEffectSuite` | CLI arg parsing, pipeline wiring, error exit codes     |
 
-`InputParserSuite` uses `CatsEffectSuite` because parsing is effectful. The calculator and
-formatter suites use `FunSuite` — there is no reason to bring in an effect type for pure functions.
+`InputParserSuite` and `RankingIOSuite` use `CatsEffectSuite` because they exercise effectful
+operations. The calculator and formatter suites use `FunSuite` — there is no reason to bring in
+an effect type for pure functions.
 
 ```bash
 scala-cli test .
@@ -195,13 +196,14 @@ stage depended on a later one.
 
 | Stage | What changed                 | Key decision                                                       |
 | ----- | ---------------------------- | ------------------------------------------------------------------ |
-| 1     | Core implementation          | Tagless final scoped to `InputParser`; `Functor`-only on `Program` |
+| 1     | Core implementation          | Tagless final scoped to `InputParser`; pure traits for the rest    |
 | 2     | Package refactor             | Feature packages; pure vs effectful split made explicit            |
 | 3     | Tooling                      | scalafmt, scalafix, CI; `project.scala` excluded from scalafmt     |
-| 4     | `--output-file` option       | Decline `Opts` compose; no changes to `Program` or pure stages     |
+| 4     | `--output-file` option       | Decline `Opts` compose; output routing lives in `Main`             |
 | 5     | Interactive stdin            | TTY via `System.console()`; inline validation as a follow-up       |
 | 6     | Docker + release             | Three-stage Dockerfile; `scratch` isolates JAR from Bloop socket   |
 | 7     | Input boundary validation    | Trim whitespace at parse boundaries; reject negative scores        |
+| 8     | Architecture cleanup         | Extract `RankingIO`; drop `Program`; clean error output to stderr  |
 
 See [docs/development.md](docs/development.md) for the full rationale behind each stage.
 
