@@ -1,6 +1,6 @@
 # Development History
 
-This document traces the eight stages of development, explaining the decisions made at each step.
+This document traces the nine stages of development, explaining the decisions made at each step.
 Each stage was independently shippable — no stage depended on a later one.
 
 ---
@@ -287,6 +287,9 @@ for
 yield ExitCode.Success
 ```
 
+(This snapshot reflects Stage 8. Stage 9 replaces `RankingIO` with `LineReader[F]` and
+`ResultWriter[F]`; Stage 10 introduces typeclasses and removes `InputParser`.)
+
 `ProgramSuite` was deleted with it. The individual unit suites already cover each stage; the
 end-to-end pipeline is covered by `IntegrationSuite`.
 
@@ -326,3 +329,119 @@ yield ExitCode.Success).handleErrorWith { e =>
 
 This matches the clean format used in interactive mode and gives the caller a meaningful exit code
 without leaking implementation details through a stack trace.
+
+---
+
+## Stage 9 — I/O algebras
+
+**Commits:** _(this stage)_
+
+### Splitting RankingIO into LineReader[F] and ResultWriter[F]
+
+`RankingIO` was a plain `object` with two concrete `IO` methods. It correctly separated I/O
+from `Main`, but stopped short of the project's own pattern: effectful boundaries expressed as
+tagless-final algebras with `make[F[_]: Constraint]` smart constructors and `private Live`
+implementations.
+
+The Stage 8 rationale argued against tagless final for `RankingIO` on the grounds that the
+methods called `System.console()`, `scala.io.Source`, and `java.io.PrintWriter` directly — and
+that there was "no meaningful abstraction over the effect type." That argument conflates two
+things. The implementations do call concrete JVM APIs, but the *capability* — read lines from
+some source, write lines to some destination — is a genuine I/O effect that benefits from the
+same structure used elsewhere in the project. `Sync[F]` is the honest minimum constraint for
+suspending and blocking JVM calls; it does not require `IO` specifically.
+
+`RankingIO` is replaced by two algebras placed in their natural packages:
+
+```
+input/LineReader[F]    — read: F[List[A]]    (Sync + LineParseable[A])
+output/ResultWriter[F] — write(as): F[Unit]  (Sync + LineRenderable[A])
+```
+
+Each follows the established pattern: a public trait, a companion `make[F[_]: Sync, A: TC]`
+smart constructor, and a `final private class Live` that holds the implementation.
+
+`RankingIOSuite` is replaced by `input/LineReaderSuite` and `output/ResultWriterSuite`, keeping
+the test–source co-location consistent across the entire project.
+
+---
+
+## Stage 10 — Typeclasses
+
+**Commits:** _(this stage)_
+
+### Introducing LineParseable[A] and LineRenderable[A]
+
+Stages 1–9 expressed the full pipeline through a combination of effectful algebras (`InputParser`,
+`LineReader`, `ResultWriter`) and pure function traits (`RankingCalculator`, `OutputFormatter`).
+The domain types `GameResult` and `RankedEntry` were hardcoded into specific algebra
+implementations.
+
+Extending to a second data type would have required new implementations of `InputParser`,
+`OutputFormatter`, and all the wiring in `Main` — each algebra tightly coupled to its concrete
+domain type. Two typeclasses decouple this:
+
+```
+LineParseable[A]   — parseLine(line: String): Either[Throwable, A]
+LineRenderable[A]  — renderLine(a: A): String
+```
+
+Each typeclass carries a `given` instance in its companion object (`LineParseable[GameResult]`,
+`LineRenderable[RankedEntry]`). Supporting a new data type requires only a new `given` — no
+algebra changes, no new `make` overloads.
+
+### Making algebras generic in A
+
+`LineReader[F, A]` and `ResultWriter[F, A]` are now parameterised on `A` with a typeclass
+context bound:
+
+```scala
+LineReader.make[F[_]: Sync, A: LineParseable](maybeFile: Option[Path]): LineReader[F, List[A]]
+ResultWriter.make[F[_]: Sync, A: LineRenderable](maybeFile: Option[Path]): ResultWriter[F, A]
+```
+
+`LineReader.Live` resolves `LineParseable[A]` to drive both the batch parse
+(`_.traverse(LineParseable[A].parseLine(_).liftTo[F])`) and the interactive `readLoop` (direct
+`Either` pattern-match for inline validation). `ResultWriter.Live` resolves `LineRenderable[A]`
+to render each entry before writing.
+
+### Removing InputParser and OutputFormatter
+
+With the typeclass in place, `InputParser` became a thin wrapper:
+
+```scala
+final private class Live[F[_]: ApplicativeThrow, A: LineParseable] extends InputParser[F, A]:
+  def parseLine(line: String): F[A] = LineParseable[A].parseLine(line).liftTo[F]
+```
+
+This is not an abstraction — it adds a layer with no behaviour of its own. `LineReader.Live`
+now calls `LineParseable[A].parseLine(_).liftTo[F]` directly, and `InputParser` is deleted.
+
+`OutputFormatter` had already been deleted in Stage 9 in favour of the `LineRenderable[A]`
+typeclass driving `ResultWriter.Live` directly.
+
+`Main` reflects the simplification:
+
+```scala
+val reader = LineReader.make[IO, GameResult](maybeInput)
+val writer = ResultWriter.make[IO, RankedEntry](maybeOutput)
+
+for
+  results <- reader.read
+  _       <- writer.write(calculator.calculate(results))
+yield ExitCode.Success
+```
+
+### Test layer alignment
+
+Each typeclass is tested directly in a pure `FunSuite`, keeping effectful infrastructure out of
+logic that has none:
+
+```
+input/LineParseableSuite   FunSuite — parseLine Either results, all error cases
+output/LineRenderableSuite FunSuite — renderLine formatting, singular/plural pts
+```
+
+`InputParserSuite` is deleted alongside `InputParser`. `LineReaderSuite` retains a local
+`given LineParseable[String]` to isolate I/O routing from parsing logic — the same technique
+used in `ResultWriterSuite` for `LineRenderable[String]`.

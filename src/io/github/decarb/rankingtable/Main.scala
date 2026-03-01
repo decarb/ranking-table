@@ -7,8 +7,9 @@ import com.monovore.decline.*
 import com.monovore.decline.effect.*
 import java.nio.file.Path
 import io.github.decarb.rankingtable.calculator.RankingCalculator
-import io.github.decarb.rankingtable.input.InputParser
-import io.github.decarb.rankingtable.output.OutputFormatter
+import io.github.decarb.rankingtable.domain.{GameResult, RankedEntry}
+import io.github.decarb.rankingtable.input.LineReader
+import io.github.decarb.rankingtable.output.ResultWriter
 
 object Main extends CommandIOApp(
   name = "ranking-table",
@@ -27,14 +28,13 @@ object Main extends CommandIOApp(
 
   def main: Opts[IO[ExitCode]] =
     (inputFileOpt, outputFileOpt).mapN { (maybeInput, maybeOutput) =>
-      val parser     = InputParser.make[IO]
       val calculator = RankingCalculator.make
-      val formatter  = OutputFormatter.make
+      val reader     = LineReader.make[IO, GameResult](maybeInput)
+      val writer     = ResultWriter.make[IO, RankedEntry](maybeOutput)
 
       (for
-        lines   <- RankingIO.readLines(maybeInput, parser)
-        results <- parser.parseLines(lines)
-        _ <- RankingIO.writeOutput(formatter.format(calculator.calculate(results)), maybeOutput)
+        results <- reader.read
+        _       <- writer.write(calculator.calculate(results))
       yield ExitCode.Success).handleErrorWith { e =>
         Console[IO].errorln(s"Error: ${e.getMessage}").as(ExitCode.Error)
       }

@@ -65,23 +65,25 @@ domain/types.scala            TeamName, Score (opaque types)
 domain/GameResult.scala       GameResult
 domain/RankedEntry.scala      RankedEntry
 
-input/InputParser[F]          parse lines → F[List[GameResult]]  (ApplicativeThrow — can fail)
-calculator/RankingCalculator  GameResult  → List[RankedEntry]    (pure)
-output/OutputFormatter        List[RankedEntry] → List[String]   (pure)
+input/LineParseable[A]        String → Either[Throwable, A]       (typeclass)
+input/LineReader[F]           readLines — file, piped stdin, interactive TTY  (Sync)
+calculator/RankingCalculator  GameResult  → List[RankedEntry]     (pure)
+output/LineRenderable[A]      A → String                          (typeclass)
+output/ResultWriter[F]        writeLines — file or stdout         (Sync)
 
-RankingIO                     readLines / writeOutput (file, piped stdin, interactive TTY)
 Main                          CommandIOApp wiring + decline CLI options
 ```
 
-`InputParser` is the only effectful algebra; `RankingCalculator` and `OutputFormatter` are pure traits with no `F[_]`. `Main` composes all three stages inline; `RankingIO` owns the I/O boundary.
+`LineReader` and `ResultWriter` are effectful algebras. `RankingCalculator` is a pure trait with no `F[_]`. Parsing and rendering are typeclasses — `LineParseable[A]` and `LineRenderable[A]` — resolved implicitly by the I/O algebras. `Main` composes all stages inline.
 
 Test suites mirror the source structure:
 
 ```
-input/InputParserSuite              CatsEffectSuite (effectful)
+input/LineParseableSuite            FunSuite (pure — parse logic and error cases)
+input/LineReaderSuite               CatsEffectSuite (file reading, empty filtering)
 calculator/RankingCalculatorSuite   FunSuite (pure)
-output/OutputFormatterSuite         FunSuite (pure)
-RankingIOSuite                      CatsEffectSuite (file reading and writing)
+output/LineRenderableSuite          FunSuite (pure — rendering logic)
+output/ResultWriterSuite            CatsEffectSuite (file writing)
 IntegrationSuite                    CatsEffectSuite (CLI wiring through Main)
 ```
 
