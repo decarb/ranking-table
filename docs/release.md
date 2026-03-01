@@ -66,25 +66,58 @@ java -jar ranking-table.jar results.txt
 java -jar ranking-table.jar results.txt --output-file rankings.txt
 ```
 
-## Testing a release locally
+## Smoke testing a local build
 
-Build and run the Docker image locally before pushing a tag:
+Build a fresh image from the current source, then run through all input modes and verify exit
+codes before merging or tagging a release.
 
 ```bash
 docker build -t ranking-table .
+```
 
-# Pipe input
-echo "Lions 3, Snakes 3" | docker run --rm -i ranking-table
+**Piped input** — exit 0, correct ranking printed to stdout:
 
-# File input
+```bash
+printf "Lions 3, Snakes 3\nTarantulas 1, FC Awesome 0\nLions 1, FC Awesome 1\nTarantulas 3, Snakes 1\nLions 4, Grouches 0\n" \
+  | docker run --rm -i ranking-table
+# 1. Tarantulas, 6 pts
+# 2. Lions, 5 pts
+# 3. FC Awesome, 1 pt
+# 3. Snakes, 1 pt
+# 5. Grouches, 0 pts
+```
+
+**File input** — exit 0, same output:
+
+```bash
 docker run --rm -v $(pwd)/results.txt:/app/results.txt ranking-table results.txt
+```
 
-# File input with output file
+**File input with output file** — exit 0, content written to mounted file:
+
+```bash
+touch rankings.txt
 docker run --rm \
   -v $(pwd)/results.txt:/app/results.txt \
   -v $(pwd)/rankings.txt:/app/rankings.txt \
   ranking-table results.txt --output-file rankings.txt
+cat rankings.txt
 ```
+
+**Help flag** — exit 0, usage printed:
+
+```bash
+docker run --rm ranking-table --help
+```
+
+**Invalid input (file)** — exit 1, clean `Error: ...` line on stderr, no stack trace:
+
+```bash
+echo "not a valid line" | docker run --rm -i ranking-table 2>&1
+# Error: Expected 'Team score, Team score' but got: 'not a valid line'
+```
+
+All six checks must pass before merging or tagging a release.
 
 To trigger the full release workflow without creating an official release, push a pre-release tag:
 
