@@ -1,13 +1,13 @@
 # Development History
 
-This document traces the nine stages of development, explaining the decisions made at each step.
+This document traces the ten stages of development, explaining the decisions made at each step.
 Each stage was independently shippable — no stage depended on a later one.
 
 ---
 
 ## Stage 1 — Core implementation
 
-**Commits:** `8171568`, `15ec5f4`, `0b7c741`, `6bc2e21`, `570c6d9`
+**Commits:** `8171568`, `15ec5f4`, `0b7c741`
 
 The first working version established the three-stage pipeline (`InputParser` →
 `RankingCalculator` → `OutputFormatter`), composed by `Program` and wired to `IO` in `Main`.
@@ -16,32 +16,22 @@ The first working version established the three-stage pipeline (`InputParser` �
 
 `InputParser` can fail — a malformed line must raise an error, not be silently discarded. It is
 expressed as a tagless-final algebra over `F[_]: ApplicativeThrow`, which makes the failure mode
-explicit in the type and keeps the implementation testable against any effect type without
-depending on `IO` directly.
+explicit in the type and keeps the implementation testable without depending on `IO` directly.
 
 `RankingCalculator` and `OutputFormatter` have no effects. Applying tagless final to them would
 add `F[_]` parameters that serve no purpose. They are plain traits with a single `Live`
 implementation, making their purity obvious from the signature alone.
 
 > **Why `Functor` on `Program`?** `Program` only maps the parser result through two pure
-> functions — it does not need to sequence effects or handle errors. Requiring `Monad` or `IO`
-> would overstate what the component actually does. `Functor` is the honest minimum, and it keeps
-> `Program` testable with any `Functor` instance rather than requiring a full effect runtime.
+> functions — it does not need to sequence effects or handle errors. `Functor` is the honest
+> minimum, and it keeps `Program` testable without requiring a full effect runtime.
 
 ### Opaque types for domain newtypes
 
 `TeamName` and `Score` are opaque types over `String` and `Int`. They have zero runtime overhead
-— no boxing, no allocation — but prevent type confusion at call sites. The compiler rejects a
-`Score` where a `TeamName` is expected, enforced entirely at compile time with no runtime cost.
-
-Smart constructors (`TeamName.apply`, `Score.apply`) on each companion object are the only
-creation path, keeping validation centralised.
-
-### Domain split into separate files
-
-The domain types (`TeamName`, `Score`, `GameResult`, `RankedEntry`) were split into separate
-files from the outset — one responsibility per file, each independently navigable and reusable
-without pulling in unrelated types.
+but prevent type confusion at call sites — the compiler rejects a `Score` where a `TeamName` is
+expected. Smart constructors on each companion object are the only creation path, keeping
+validation centralised.
 
 ---
 
@@ -65,19 +55,19 @@ Tests were moved to mirror this structure exactly.
 
 > **Why feature packages over layer packages?** A layer-based layout (`model/`, `service/`,
 > `util/`) forces unrelated features to share directories and creates cross-package imports for
-> every operation. Feature packages keep related code together — the parser algebra, its live
+> every operation. Feature packages keep related code together — the parser algebra, its
 > implementation, and its tests all live in `input/`. Adding a new feature means adding a new
-> package, not modifying an existing one.
+> package, not touching an existing one.
 
-> **Why repackage to `io.github.decarb`?** The Java package naming convention uses a reversed
-> domain name to guarantee global uniqueness. `io.github.decarb.rankingtable` is unambiguous and
+> **Why repackage to `io.github.decarb`?** The Java convention uses a reversed domain name to
+> guarantee global uniqueness. `io.github.decarb.rankingtable` is unambiguous and
 > production-appropriate, which aligns with the "production ready" requirement in the test brief.
 
 ---
 
 ## Stage 3 — Tooling
 
-**Commits:** `2a6bfaa`, `7267dfa`, `eb5948d`, `6517686`, `3d16101`, `30f74a7`
+**Commits:** `2a6bfaa`, `7267dfa`, `eb5948d`, `6517686`
 
 Three tooling additions were made in sequence: scalafmt, scalafix, then CI.
 
@@ -112,21 +102,12 @@ merging. See [docs/ci.md](ci.md) for the full configuration.
 
 ## Stage 4 — `--output-file` option
 
-**Commits:** `2efe53c`, `e185adc`
+**Commits:** `2efe53c`
 
 An optional `--output-file` / `-o` flag was added to write ranking output to a file instead of
-stdout.
-
-`Main` was extended with a second `Opts` value:
-
-```scala
-val outputFileOpt: Opts[Option[Path]] =
-  Opts.option[Path]("output-file", short = "o", help = "Write output to file").orNone
-```
-
-The two options are combined with `(inputFileOpt, outputFileOpt).mapN`, keeping the CLI contract
-composable. `Program` and both pure stages were untouched — the output routing decision lives
-entirely in `Main`.
+stdout. The two options are combined with `(inputFileOpt, outputFileOpt).mapN`, keeping the CLI
+contract composable. `Program` and both pure stages were untouched — the output routing decision
+lives entirely in `Main`.
 
 > **Why Decline over manual argument parsing?** Decline models CLI options as values that compose
 > naturally with `mapN`, `orNone`, and `withDefault`. It validates inputs before `main` runs,
@@ -159,58 +140,50 @@ native terminal sessions.
 
 ### Inline validation
 
-The initial prompt loop (`27ddaa0`) collected all lines first, then parsed them in bulk. A
-follow-up commit (`0dc55f1`) added per-line validation: `InputParser` is threaded into the loop
-and each line is validated immediately on entry. An invalid line prints an error and re-prompts;
-the user corrects it without starting over.
+The initial prompt loop collected all lines first, then parsed them in bulk. A follow-up commit
+added per-line validation: each line is validated immediately on entry, printing an error and
+re-prompting on failure rather than failing at batch-parse time.
 
-> **Why a separate commit for validation?** The prompt loop and the validation logic are
-> independent concerns. Shipping the loop first confirmed TTY detection worked correctly before
-> adding the parser dependency. The follow-up was a clean, focused change that was easy to review
-> and easy to revert if needed.
-
-The test suite was restructured at the same time: `IntegrationSuite` (which had been testing
-`Program` directly) was renamed `ProgramSuite`, and a new `IntegrationSuite` was added to test
-CLI wiring through `Main`.
+`IntegrationSuite` was split from `ProgramSuite` at this point to test CLI wiring through `Main`
+separately from the pipeline logic.
 
 ---
 
 ## Stage 6 — Docker and release
 
-**Commits:** `4b91075`, `6fbb143`, `0382e45`, `8e3706b`, `deda0d5`
+**Commits:** `4b91075`, `0382e45`, `6fbb143`, `deda0d5`
 
 ### Dockerfile
 
 The Dockerfile uses three stages:
 
-| Stage       | Base                          | Purpose                                                |
-| ----------- | ----------------------------- | ------------------------------------------------------ |
-| `builder`   | `virtuslab/scala-cli`         | Compiles source and produces the assembly JAR          |
-| `jar-export` | `scratch`                    | Holds only the JAR for clean CI extraction             |
-| *(default)* | `eclipse-temurin:21-jre-alpine` | Minimal runtime image for `docker build` / `docker run` |
+| Stage        | Base                            | Purpose                                       |
+| ------------ | ------------------------------- | --------------------------------------------- |
+| `builder`    | `virtuslab/scala-cli`           | Compiles source and produces the assembly JAR |
+| `jar-export` | `scratch`                       | Holds only the JAR for clean CI extraction    |
+| *(default)*  | `eclipse-temurin:21-jre-alpine` | Minimal runtime image for `docker run`        |
 
 > **Why the `scratch` stage?** The `builder` stage leaves a Bloop Unix domain socket on disk.
 > BuildKit's local exporter cannot handle socket files and fails when trying to copy the build
-> output. The `jar-export` stage copies only the JAR into an empty (`scratch`) image, giving the
-> exporter a clean, portable artifact. `docker build -t ranking-table .` always targets the
-> default stage — local usage is unaffected by the intermediate stage.
+> output. The `jar-export` stage copies only the JAR into an empty image, giving the exporter a
+> clean, portable artifact.
 
-> **Why `eclipse-temurin:21-jre-alpine`?** It is the smallest official JRE image matching the
-> JVM version used in CI. Alpine-based images are significantly smaller than Debian counterparts
-> and have a minimal attack surface.
+> **Why `eclipse-temurin:21-jre-alpine`?** The smallest official JRE image matching the JVM
+> version used in CI. Alpine-based images are significantly smaller than Debian counterparts and
+> have a minimal attack surface.
 
 ### Release workflow
 
-The release workflow triggers on `v*` tags and runs three steps in sequence:
+The release workflow triggers on `v*` tags and runs three steps:
 
 1. Builds and pushes a Docker image to `ghcr.io`, tagged with the version
-2. Extracts the JAR via the `jar-export` stage using BuildKit's local exporter — this reuses the
-   layer cache from step 1, so no recompilation occurs
+2. Extracts the JAR via the `jar-export` stage — reuses the layer cache from step 1, so no
+   recompilation occurs
 3. Creates a GitHub Release with the JAR attached and auto-generated release notes
 
-> **Why tag-triggered releases rather than releasing on every merge?** Merging to `main` and
-> releasing are separate decisions. A patch merge may not warrant a release; several changes may
-> be batched into one. Manual tagging keeps release control explicit and prevents release noise.
+> **Why tag-triggered releases?** Merging to `main` and releasing are separate decisions. A patch
+> merge may not warrant a release; several changes may be batched into one. Manual tagging keeps
+> release control explicit.
 
 See [docs/release.md](release.md) for the full release process.
 
@@ -218,106 +191,63 @@ See [docs/release.md](release.md) for the full release process.
 
 ## Stage 7 — Input boundary validation
 
-**Commits:** `a1f379d`
+**Commits:** `b7cfafb`
 
-Three edge cases in `InputParser.Live` were identified and fixed after the core implementation
-was complete.
+Three edge cases in `InputParser.Live` were identified and fixed after the core implementation.
 
 ### Whitespace trimming
 
 Leading and trailing whitespace on a line, or extra spaces around a team name, were silently
-included in the extracted `TeamName`. Two entries differing only in surrounding whitespace were
-treated as separate teams by `RankingCalculator`.
-
-The fix adds `.trim` at two points: the full line before splitting, and the extracted name before
-constructing `TeamName`. This is the right boundary for normalisation — internal whitespace within
-a name (e.g. `FC Awesome`) is preserved, only surrounding whitespace is stripped.
+included in the extracted `TeamName`, causing entries differing only in whitespace to be treated
+as separate teams. The fix adds `.trim` at two points: the full line before splitting, and the
+extracted name before constructing `TeamName`. Internal whitespace within a name (e.g. `FC
+Awesome`) is preserved.
 
 ### Negative scores
 
-`scoreStr.toIntOption` accepted any integer. `"-3".toIntOption` returns `Some(-3)`, so a negative
-score silently produced an incorrect result rather than a parse error.
-
-The fix adds `.filter(_ >= 0)`: `None` falls through to the existing `ParseError` case with no
-special-case handling.
+`scoreStr.toIntOption` accepted any integer. The fix adds `.filter(_ >= 0)`: `None` falls through
+to the existing `ParseError` case with no special handling.
 
 ### Empty team name after trim
 
-A fragment like `"   3"` passes the `lastSpace <= 0` guard (the last space is at a valid index)
-but produces an empty string after `.trim`. The fix adds an emptiness check after trimming, before
-constructing `TeamName`.
+A fragment like `"   3"` passes the `lastSpace <= 0` guard but produces an empty string after
+`.trim`. The fix adds an emptiness check after trimming.
 
 ### Case sensitivity — documented, not normalised
 
 `Map[TeamName, Int]` in `RankingCalculator` uses case-sensitive equality. Normalising correctly
-for all team name formats (abbreviations, hyphenated names, apostrophes) is non-trivial, and the
-test spec is silent on casing while the sample data is internally consistent. The behaviour is
-documented in the Input format section of `README.md` rather than normalised away.
+for all team name formats is non-trivial, and the test spec is silent on casing while the sample
+data is internally consistent. The behaviour is documented in `README.md` rather than normalised.
 
 ---
 
 ## Stage 8 — Architecture cleanup and error output
 
-**Commits:** `TBD`
-
-Two related improvements were made together: a structural refactor of `Main` and `Program`, and
-a fix for unhandled exceptions printing stack traces in batch mode.
+**Commits:** `8928cfa`
 
 ### Removing Program
 
-`Program` composed `InputParser`, `RankingCalculator`, and `OutputFormatter` in a single
-`run(lines: List[String]): F[List[String]]` call. Its only logic was one chain:
+`Program` composed the three pipeline stages in a single call:
 
 ```scala
 parser.parseLines(lines).map(calculator.calculate).map(formatter.format)
 ```
 
 This is not a meaningful abstraction — it adds a file, a class, and a `Functor` constraint
-without encapsulating any complexity. Each of the three stages it wires together is already
-self-contained, independently testable, and well-named. The composition is short enough to read
-directly inline.
-
-`Program` was deleted. The pipeline now lives explicitly in `Main.main`'s `for` comprehension:
-
-```scala
-for
-  lines   <- RankingIO.readLines(maybeInput, parser)
-  results <- parser.parseLines(lines)
-  _       <- RankingIO.writeOutput(formatter.format(calculator.calculate(results)), maybeOutput)
-yield ExitCode.Success
-```
-
-(This snapshot reflects Stage 8. Stage 9 replaces `RankingIO` with `LineReader[F]` and
-`ResultWriter[F]`; Stage 10 introduces typeclasses and removes `InputParser`.)
-
-`ProgramSuite` was deleted with it. The individual unit suites already cover each stage; the
-end-to-end pipeline is covered by `IntegrationSuite`.
+without encapsulating any complexity. `Program` was deleted and the pipeline moved inline to
+`Main.main`'s `for` comprehension. `ProgramSuite` was deleted with it; the individual unit suites
+already cover each stage and `IntegrationSuite` covers the end-to-end pipeline.
 
 ### Extracting RankingIO
 
-`Main` previously contained five private methods for reading and writing — `readLines`,
-`readLinesFromFile`, `readLinesFromStdin`, `readLinesInteractive`, `readLoop`, and `writeOutput`.
-This is where the real complexity lives: TTY detection, the interactive prompt loop, per-line
-validation, and output routing. Keeping it inside `Main` buried substantive logic next to CLI
-wiring.
-
-`RankingIO` extracts that I/O boundary into its own file. `Main` is left with only what it should
-own: decline option definitions and the `for` comprehension that sequences the pipeline.
-
-> **Why not tagless final for `RankingIO`?** These methods are `IO`-specific by nature — they
-> call `System.console()`, `scala.io.Source`, and `java.io.PrintWriter`. There is no meaningful
-> abstraction over the effect type here. A plain `object` with concrete `IO` methods is honest;
-> wrapping it in `F[_]` would be form over function.
+Five private methods for reading and writing lived inside `Main`, burying I/O logic next to CLI
+wiring. `RankingIO` extracted that boundary into its own file. `Main` was left with only what it
+should own: decline option definitions and the pipeline `for` comprehension.
 
 ### Clean error output in batch mode
 
-In interactive mode, parse errors were caught inside `readLoop` with `.attempt` and printed as a
-clean `Error: <message>` line before re-prompting. In batch mode (piped input or file argument),
-errors propagated unhandled out of the `for` comprehension. `CommandIOApp` caught them at the top
-level and printed the full JVM stack trace before exiting with code 1.
-
-The fix adds `.handleErrorWith` after the `for` comprehension, printing `e.getMessage` to stderr
-via `Console[IO].errorln` and returning `ExitCode.Error`:
+In batch mode, errors propagated unhandled and `CommandIOApp` printed the full JVM stack trace.
+The fix adds `.handleErrorWith` after the `for` comprehension:
 
 ```scala
 (for
@@ -327,204 +257,89 @@ yield ExitCode.Success).handleErrorWith { e =>
 }
 ```
 
-This matches the clean format used in interactive mode and gives the caller a meaningful exit code
-without leaking implementation details through a stack trace.
-
 ---
 
-## Stage 9 — I/O algebras
+## Stage 9 — I/O algebras and typeclasses
 
-**Commits:** _(this stage)_
+**Commits:** `36dec7a`
 
-### Splitting RankingIO into LineReader[F] and ResultWriter[F]
+### LineParseable[A] and LineRenderable[A]
 
-`RankingIO` was a plain `object` with two concrete `IO` methods. It correctly separated I/O
-from `Main`, but stopped short of the project's own pattern: effectful boundaries expressed as
-tagless-final algebras with `make[F[_]: Constraint]` smart constructors and `private Live`
-implementations.
-
-The Stage 8 rationale argued against tagless final for `RankingIO` on the grounds that the
-methods called `System.console()`, `scala.io.Source`, and `java.io.PrintWriter` directly — and
-that there was "no meaningful abstraction over the effect type." That argument conflates two
-things. The implementations do call concrete JVM APIs, but the *capability* — read lines from
-some source, write lines to some destination — is a genuine I/O effect that benefits from the
-same structure used elsewhere in the project. `Sync[F]` is the honest minimum constraint for
-suspending and blocking JVM calls; it does not require `IO` specifically.
-
-`RankingIO` is replaced by two algebras placed in their natural packages:
-
-```
-input/LineReader[F]    — read: F[List[A]]    (Sync + LineParseable[A])
-output/ResultWriter[F] — write(as): F[Unit]  (Sync + LineRenderable[A])
-```
-
-Each follows the established pattern: a public trait, a companion `make[F[_]: Sync, A: TC]`
-smart constructor, and a `final private class Live` that holds the implementation.
-
-`RankingIOSuite` is replaced by `input/LineReaderSuite` and `output/ResultWriterSuite`, keeping
-the test–source co-location consistent across the entire project.
-
----
-
-## Stage 10 — Typeclasses
-
-**Commits:** _(this stage)_
-
-### Introducing LineParseable[A] and LineRenderable[A]
-
-Stages 1–9 expressed the full pipeline through a combination of effectful algebras (`InputParser`,
-`LineReader`, `ResultWriter`) and pure function traits (`RankingCalculator`, `OutputFormatter`).
-The domain types `GameResult` and `RankedEntry` were hardcoded into specific algebra
-implementations.
-
-Extending to a second data type would have required new implementations of `InputParser`,
-`OutputFormatter`, and all the wiring in `Main` — each algebra tightly coupled to its concrete
-domain type. Two typeclasses decouple this:
+Two typeclasses decouple parsing and rendering from the I/O algebras:
 
 ```
 LineParseable[A]   — parseLine(line: String): Either[Throwable, A]
 LineRenderable[A]  — renderLine(a: A): String
 ```
 
-Each typeclass carries a `given` instance in its companion object (`LineParseable[GameResult]`,
-`LineRenderable[RankedEntry]`). Supporting a new data type requires only a new `given` — no
-algebra changes, no new `make` overloads.
+Each carries a `given` instance in its companion object. Supporting a new data type requires only
+a new `given` — no algebra changes.
 
-### Making algebras generic in A
+### Replacing RankingIO with LineReader[F] and ResultWriter[F]
 
-`LineReader[F, A]` and `ResultWriter[F, A]` are now parameterised on `A` with a typeclass
-context bound:
+`RankingIO` was a plain `object` with concrete `IO` methods. Stage 8 had argued against tagless
+final on the grounds that the methods called JVM APIs directly. That conflates implementation
+detail with capability: the *capability* — read lines, write lines — is a genuine I/O effect.
+`Sync[F]` is the honest minimum constraint; it does not require `IO` specifically.
 
-```scala
-LineReader.make[F[_]: Sync, A: LineParseable](maybeFile: Option[Path]): LineReader[F, List[A]]
-ResultWriter.make[F[_]: Sync, A: LineRenderable](maybeFile: Option[Path]): ResultWriter[F, A]
+`RankingIO` is replaced by two algebras:
+
 ```
-
-`LineReader.Live` resolves `LineParseable[A]` to drive both the batch parse
-(`_.traverse(LineParseable[A].parseLine(_).liftTo[F])`) and the interactive `readLoop` (direct
-`Either` pattern-match for inline validation). `ResultWriter.Live` resolves `LineRenderable[A]`
-to render each entry before writing.
+input/LineReader[F]    — read: F[List[String]]  (Sync)
+output/ResultWriter[F] — write(lines): F[Unit]  (Sync)
+```
 
 ### Removing InputParser and OutputFormatter
 
-With the typeclass in place, `InputParser` became a thin wrapper:
+With `LineParseable[A]` in place, `InputParser` became a thin wrapper with no behaviour of its
+own. `Main` calls `LineParseable[GameResult].parseLine` directly. `OutputFormatter` was absorbed
+into `ResultWriter` in the same pass.
 
-```scala
-final private class Live[F[_]: ApplicativeThrow, A: LineParseable] extends InputParser[F, A]:
-  def parseLine(line: String): F[A] = LineParseable[A].parseLine(line).liftTo[F]
-```
+### Test alignment
 
-This is not an abstraction — it adds a layer with no behaviour of its own. `LineReader.Live`
-now calls `LineParseable[A].parseLine(_).liftTo[F]` directly, and `InputParser` is deleted.
-
-`OutputFormatter` had already been deleted in Stage 9 in favour of the `LineRenderable[A]`
-typeclass driving `ResultWriter.Live` directly.
-
-`Main` reflects the simplification:
-
-```scala
-val reader = LineReader.make[IO, GameResult](maybeInput)
-val writer = ResultWriter.make[IO, RankedEntry](maybeOutput)
-
-for
-  results <- reader.read
-  _       <- writer.write(calculator.calculate(results))
-yield ExitCode.Success
-```
-
-### Test layer alignment
-
-Each typeclass is tested directly in a pure `FunSuite`, keeping effectful infrastructure out of
-logic that has none:
+Each typeclass is tested in a pure `FunSuite`:
 
 ```
-input/LineParseableSuite   FunSuite — parseLine Either results, all error cases
-output/LineRenderableSuite FunSuite — renderLine formatting, singular/plural pts
+input/GameResultLineParseSuite    FunSuite — parseLine results and all error cases
+output/RankedEntryLineRenderSuite FunSuite — renderLine formatting, singular/plural pts
 ```
 
-`InputParserSuite` is deleted alongside `InputParser`. `LineReaderSuite` retains a local
-`given LineParseable[String]` to isolate I/O routing from parsing logic — the same technique
-used in `ResultWriterSuite` for `LineRenderable[String]`.
+`InputParserSuite` is deleted alongside `InputParser`.
 
 ---
 
-## Stage 11 — Narrow algebras
+## Stage 10 — Narrow algebras
 
-**Commits:** _(this stage)_
+**Commits:** `b17fd93`, `f9972f4`, `96c4a42`
 
 ### Moving routing and typeclass dispatch to Main
 
-`LineReader[F, A]` and `ResultWriter[F, A]` each bundled two concerns that do not belong in a
-narrow I/O algebra:
-
-- **Routing** — deciding which I/O operation to perform based on `Option[Path]` or
-  `System.console()`. This is a wiring decision that depends on CLI arguments — the domain of
-  `Main`.
-- **Type dispatch** — resolving `LineParseable[A]` or `LineRenderable[A]` and applying the
-  conversion. This is a pure transformation step, not an I/O primitive.
-
-### Stripping type parameters from the algebras
-
-`LineReader[F, A]` becomes `LineReader[F]`. Three single-purpose smart constructors replace `make`:
+`LineReader[F]` and `ResultWriter[F]` each bundled routing (which source or destination to use)
+alongside raw I/O — a decision that belongs in `Main`. Three single-purpose constructors replace
+the routing `make`:
 
 ```scala
-trait LineReader[F[_]]:
-  def read: F[List[String]]
-
 LineReader.fromFile[F[_]: Sync](path: Path): LineReader[F]
 LineReader.fromStdin[F[_]: Sync]: LineReader[F]
-LineReader.interactive[F[_]: Sync](console: java.io.Console): LineReader[F]
-```
-
-`ResultWriter[F, A]` becomes `ResultWriter[F]`. Two single-purpose smart constructors replace `make`:
-
-```scala
-trait ResultWriter[F[_]]:
-  def write(lines: List[String]): F[Unit]
+LineReader.interactive[F[_]: Sync](console: java.io.Console, validate: String => Either[Throwable, ?]): LineReader[F]
 
 ResultWriter.toFile[F[_]: Sync](path: Path): ResultWriter[F]
 ResultWriter.toStdout[F[_]: Sync]: ResultWriter[F]
 ```
 
-### Routing and dispatch in Main
-
-`Main` pattern-matches on CLI arguments and `System.console()` to select the right constructor,
-then calls the typeclasses explicitly between the I/O steps:
-
-```scala
-val reader: IO[List[String]] = maybeInput match
-  case Some(path) => LineReader.fromFile[IO](path).read
-  case None       =>
-    IO.blocking(System.console()).flatMap {
-      case null    => LineReader.fromStdin[IO].read
-      case console => LineReader.interactive[IO](console, LineParseable[GameResult].parseLine).read
-    }
-
-val writer: List[String] => IO[Unit] = maybeOutput match
-  case Some(path) => ResultWriter.toFile[IO](path).write
-  case None       => ResultWriter.toStdout[IO].write
-
-for
-  raw     <- reader
-  results <- raw.traverse(LineParseable[GameResult].parseLine(_).liftTo[IO])
-  _       <- writer(calculator.calculate(results).map(LineRenderable[RankedEntry].renderLine))
-yield ExitCode.Success
-```
-
-The pipeline steps are now all visible in `Main`: read raw strings → parse to domain types →
-calculate → render to strings → write. Each algebra does exactly what its name says.
+`Main` selects the constructor and calls the typeclasses explicitly between I/O steps, making the
+full pipeline visible: read raw strings → parse → calculate → render → write.
 
 ### Interactive validation
 
-The interactive loop re-prompts on parse errors inline, validating each line before accepting
-it. `LineReader` stays type-agnostic by accepting a `String => Either[Throwable, ?]` validator
-rather than a `LineParseable[A]` context bound — `Main` passes
-`LineParseable[GameResult].parseLine` at the call site. The loop sees only the `Either` result
-and the error message; the domain type never leaks into the algebra.
+`LineReader.interactive` accepts a `String => Either[Throwable, ?]` validator rather than a
+`LineParseable[A]` context bound. `Main` passes `LineParseable[GameResult].parseLine` at the
+call site. The loop sees only the `Either` result; the domain type never leaks into the algebra.
 
-### Test alignment
+### Test coverage
 
-`LineReaderSuite` drops the local `given LineParseable[String]` that was needed to satisfy the
-old type parameter — the reader now returns `List[String]` directly, so no parser is needed.
-`ResultWriterSuite` drops the corresponding `given LineRenderable[String]`. Both suites become
-simpler: they test only the I/O behaviour they are named for.
+`LineReaderSuite` tests only `fromFile`. `fromStdin` reads directly from the process's stdin and
+cannot be redirected cleanly in a test environment. `interactive` requires a `java.io.Console`,
+which `System.console()` returns `null` for in any non-TTY context — it is a final class with no
+public constructor, so there is no clean way to construct or inject a test instance. Both
+constructors are covered at the integration level through `IntegrationSuite`.

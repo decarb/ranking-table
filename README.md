@@ -83,23 +83,11 @@ cat results.txt | scala-cli run .
 
 ```bash
 scala-cli run . -- results.txt
-```
-
-### File input with output file
-
-```bash
 scala-cli run . -- results.txt --output-file rankings.txt
-```
-
-### Help
-
-```bash
 scala-cli run . -- --help
 ```
 
 ## Input format
-
-Each line contains one match result:
 
 ```
 <Home Team> <Home Score>, <Away Team> <Away Score>
@@ -125,8 +113,6 @@ are formatted as `1 pt` (singular) and `0 pts` / `2 pts` (plural).
 
 ## Architecture
 
-The processing pipeline has three stages:
-
 ```
 LineReader[F]       read lines — file, piped stdin, and interactive TTY  (Sync)
 RankingCalculator   calculate  — List[GameResult]  →  List[RankedEntry]  (pure)
@@ -134,7 +120,7 @@ ResultWriter[F]     write output — file or stdout                         (Syn
 Main                CommandIOApp — CLI option parsing, wiring, entry point
 ```
 
-Line parsing and rendering are governed by typeclasses:
+Line parsing and rendering are typeclasses called explicitly in `Main`:
 
 ```
 LineParseable[A]   String  →  Either[Throwable, A]   (pure)
@@ -144,32 +130,8 @@ LineRenderable[A]  A       →  String                  (pure)
 Source lives under `src/io/github/decarb/rankingtable/` and tests under
 `test/io/github/decarb/rankingtable/`, mirroring the package structure.
 
-### Tagless final, scoped to where effects are real
-
-`LineReader` and `ResultWriter` perform real I/O — file access, TTY detection, stdout — and use
-`F[_]: Sync`, the minimal constraint for blocking and suspending side effects.
-
-`RankingCalculator` is a pure function — no effects, no error handling, no IO. Expressing it as
-a tagless-final algebra would add `F[_]` parameters that serve no purpose. It is a plain trait
-with a single `Live` implementation.
-
-Parsing and rendering are expressed as typeclasses (`LineParseable[A]`, `LineRenderable[A]`)
-rather than effectful algebras because neither operation requires `F[_]`. `Main` calls them
-explicitly — `LineParseable[GameResult].parseLine` after reading raw lines and
-`LineRenderable[RankedEntry].renderLine` before writing — making each transformation step
-visible in the wiring code. Adding a new data type requires only a new `given` instance — no
-algebra changes.
-
-`Main` composes all stages inline in its `for` comprehension. There is no intermediate
-orchestrator — the pipeline is short enough to read directly, and each stage is already
-independently tested.
-
-### Opaque types for domain newtypes
-
-`TeamName` and `Score` are opaque types over `String` and `Int`. They carry zero runtime overhead
-— no boxing, no wrapper allocation — but prevent accidental mix-ups at call sites: a `Score`
-cannot be passed where a `TeamName` is expected. Smart constructors on each companion object are
-the only creation path.
+See [docs/extending.md](docs/extending.md) for how to extend the pipeline to support multiple
+game formats.
 
 ## Stack
 
@@ -183,20 +145,14 @@ the only creation path.
 
 ## Testing
 
-Tests mirror the source package structure:
-
-| Suite                        | Style            | What it covers                                          |
-| ---------------------------- | ---------------- | ------------------------------------------------------- |
-| `input/LineParseableSuite`   | `FunSuite`        | Valid and invalid lines; whitespace trimming; error messages |
-| `input/LineReaderSuite`      | `CatsEffectSuite` | File reading (lines, empty filtering)                  |
-| `calculator/RankingCalculatorSuite` | `FunSuite`  | Point accumulation, tie-breaking, rank numbering      |
-| `output/LineRenderableSuite` | `FunSuite`        | Singular "pt" vs plural "pts"; rank prefixes           |
-| `output/ResultWriterSuite`   | `CatsEffectSuite` | File writing                                           |
-| `IntegrationSuite`           | `CatsEffectSuite` | CLI arg parsing, pipeline wiring, error exit codes     |
-
-`LineReaderSuite` and `ResultWriterSuite` use `CatsEffectSuite` because they exercise real I/O.
-`LineParseableSuite`, `LineRenderableSuite`, and `RankingCalculatorSuite` use `FunSuite` — there
-is no reason to bring in an effect type for pure functions.
+| Suite                               | Style            | What it covers                                               |
+| ----------------------------------- | ---------------- | ------------------------------------------------------------ |
+| `input/GameResultLineParseSuite`    | `FunSuite`       | Valid and invalid lines; whitespace trimming; error messages |
+| `input/LineReaderSuite`             | `CatsEffectSuite` | File reading (lines, empty filtering)                       |
+| `calculator/RankingCalculatorSuite` | `FunSuite`       | Point accumulation, tie-breaking, rank numbering             |
+| `output/RankedEntryLineRenderSuite` | `FunSuite`       | Singular "pt" vs plural "pts"; rank prefixes                 |
+| `output/ResultWriterSuite`          | `CatsEffectSuite` | File writing                                                |
+| `IntegrationSuite`                  | `CatsEffectSuite` | CLI arg parsing, pipeline wiring, error exit codes          |
 
 ```bash
 scala-cli test .
@@ -204,22 +160,21 @@ scala-cli test .
 
 ## Development
 
-The solution was built across eleven sequential stages. Each was independently shippable — no
+The solution was built across ten sequential stages. Each was independently shippable — no
 stage depended on a later one.
 
-| Stage | What changed                 | Key decision                                                       |
-| ----- | ---------------------------- | ------------------------------------------------------------------ |
-| 1     | Core implementation          | Tagless final scoped to `InputParser`; pure traits for the rest    |
-| 2     | Package refactor             | Feature packages; pure vs effectful split made explicit            |
-| 3     | Tooling                      | scalafmt, scalafix, CI; `project.scala` excluded from scalafmt     |
-| 4     | `--output-file` option       | Decline `Opts` compose; output routing lives in `Main`             |
-| 5     | Interactive stdin            | TTY via `System.console()`; inline validation as a follow-up       |
-| 6     | Docker + release             | Three-stage Dockerfile; `scratch` isolates JAR from Bloop socket   |
-| 7     | Input boundary validation    | Trim whitespace at parse boundaries; reject negative scores        |
-| 8     | Architecture cleanup         | Extract `RankingIO`; drop `Program`; clean error output to stderr  |
-| 9     | I/O algebras                 | Split `RankingIO` into `LineReader[F]` and `ResultWriter[F]`       |
-| 10    | Typeclasses                  | `LineParseable[A]`, `LineRenderable[A]`; drop `InputParser` and `OutputFormatter` |
-| 11    | Narrow algebras              | Strip type params from `LineReader`/`ResultWriter`; routing and dispatch move to `Main` |
+| Stage | What changed                 | Key decision                                                                          |
+| ----- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| 1     | Core implementation          | Tagless final scoped to `InputParser`; pure traits for the rest                       |
+| 2     | Package refactor             | Feature packages; pure vs effectful split made explicit                               |
+| 3     | Tooling                      | scalafmt, scalafix, CI; `project.scala` excluded from scalafmt                        |
+| 4     | `--output-file` option       | Decline `Opts` compose; output routing lives in `Main`                                |
+| 5     | Interactive stdin            | TTY via `System.console()`; inline validation as a follow-up                          |
+| 6     | Docker + release             | Three-stage Dockerfile; `scratch` isolates JAR from Bloop socket                      |
+| 7     | Input boundary validation    | Trim whitespace at parse boundaries; reject negative scores                           |
+| 8     | Architecture cleanup         | Extract `RankingIO`; drop `Program`; clean error output to stderr                     |
+| 9     | I/O algebras and typeclasses | `LineReader[F]`/`ResultWriter[F]`; `LineParseable[A]`/`LineRenderable[A]`; drop `InputParser` |
+| 10    | Narrow algebras              | Strip type params from algebras; routing and dispatch move to `Main`                  |
 
 See [docs/development.md](docs/development.md) for the full rationale behind each stage.
 
@@ -233,8 +188,7 @@ Three parallel jobs run on every pull request:
 | **Lint**      | `scala-cli fix --power . && git diff --exit-code`    | No `--check` flag; diff detects changes |
 | **Format**    | `scala-cli fmt --check .`                            | Fails with reformatting instructions |
 
-All three must pass before merging. Branches must be up to date with `main` before merge,
-preventing a stale-base CI pass from landing on a changed `main`.
+All three must pass before merging. Branches must be up to date with `main` before merge.
 
 See [docs/ci.md](docs/ci.md) for the full workflow configuration and setup steps.
 
@@ -243,20 +197,9 @@ See [docs/ci.md](docs/ci.md) for the full workflow configuration and setup steps
 ### Docker (no JDK required)
 
 ```bash
-# Build locally
 docker build -t ranking-table .
-
-# Pipe input
 echo "Lions 3, Snakes 3" | docker run --rm -i ranking-table
-
-# File input
 docker run --rm -v $(pwd)/results.txt:/app/results.txt ranking-table results.txt
-
-# File input with output file
-docker run --rm \
-  -v $(pwd)/results.txt:/app/results.txt \
-  -v $(pwd)/rankings.txt:/app/rankings.txt \
-  ranking-table results.txt --output-file rankings.txt
 ```
 
 ### JAR (requires Java 21+)
@@ -265,21 +208,16 @@ Download `ranking-table.jar` from the [latest release](../../releases/latest):
 
 ```bash
 java -jar ranking-table.jar
-java -jar ranking-table.jar results.txt
 java -jar ranking-table.jar results.txt --output-file rankings.txt
 ```
 
 ### Releases
 
-Pushing a version tag triggers the release workflow: a Docker image is pushed to `ghcr.io` and
-the assembly JAR is attached to a GitHub Release.
+Pushing a version tag builds and publishes a Docker image to `ghcr.io/decarb/ranking-table:<tag>`
+and attaches the assembly JAR to a GitHub Release:
 
 ```bash
-git tag v1.0.0
-git push --tags
+git tag v1.0.0 && git push --tags
 ```
 
-Published images: `ghcr.io/decarb/ranking-table:<tag>`.
-
-See [docs/release.md](docs/release.md) for the full release process, including how to test a
-release locally before pushing a tag.
+See [docs/release.md](docs/release.md) for the full release process.
